@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 package java.util.stream;
 
 import java.util.Comparator;
@@ -45,56 +21,24 @@ import java.util.function.ToDoubleFunction;
 import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
-/**
- * Abstract base class for an intermediate pipeline stage or pipeline source
- * stage implementing whose elements are of type {@code U}.
- *
- * @param <P_IN> type of elements in the upstream source
- * @param <P_OUT> type of elements in produced by this stage
- *
- * @since 1.8
- */
 abstract class ReferencePipeline<P_IN, P_OUT>
         extends AbstractPipeline<P_IN, P_OUT, Stream<P_OUT>>
         implements Stream<P_OUT>  {
 
-    /**
-     * Constructor for the head of a stream pipeline.
-     *
-     * @param source {@code Supplier<Spliterator>} describing the stream source
-     * @param sourceFlags the source flags for the stream source, described in
-     *        {@link StreamOpFlag}
-     * @param parallel {@code true} if the pipeline is parallel
-     */
     ReferencePipeline(Supplier<? extends Spliterator<?>> source,
                       int sourceFlags, boolean parallel) {
         super(source, sourceFlags, parallel);
     }
 
-    /**
-     * Constructor for the head of a stream pipeline.
-     *
-     * @param source {@code Spliterator} describing the stream source
-     * @param sourceFlags The source flags for the stream source, described in
-     *        {@link StreamOpFlag}
-     * @param parallel {@code true} if the pipeline is parallel
-     */
     ReferencePipeline(Spliterator<?> source,
                       int sourceFlags, boolean parallel) {
         super(source, sourceFlags, parallel);
     }
 
-    /**
-     * Constructor for appending an intermediate operation onto an existing
-     * pipeline.
-     *
-     * @param upstream the upstream element source.
-     */
     ReferencePipeline(AbstractPipeline<?, P_IN, ?> upstream, int opFlags) {
         super(upstream, opFlags);
     }
 
-    // Shape-specific methods
 
     @Override
     final StreamShape getOutputShape() {
@@ -132,7 +76,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     }
 
 
-    // BaseStream
 
     @Override
     public final Iterator<P_OUT> iterator() {
@@ -140,9 +83,7 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     }
 
 
-    // Stream
 
-    // Stateless intermediate operations from Stream
 
     @Override
     public Stream<P_OUT> unordered() {
@@ -251,7 +192,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     @Override
     public final <R> Stream<R> flatMap(Function<? super P_OUT, ? extends Stream<? extends R>> mapper) {
         Objects.requireNonNull(mapper);
-        // We can do better than this, by polling cancellationRequested when stream is infinite
         return new StatelessOp<P_OUT, R>(this, StreamShape.REFERENCE,
                                      StreamOpFlag.NOT_SORTED | StreamOpFlag.NOT_DISTINCT | StreamOpFlag.NOT_SIZED) {
             @Override
@@ -265,7 +205,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
                     @Override
                     public void accept(P_OUT u) {
                         try (Stream<? extends R> result = mapper.apply(u)) {
-                            // We can do better that this too; optimize for depth=0 case and just grab spliterator and forEach it
                             if (result != null)
                                 result.sequential().forEach(downstream);
                         }
@@ -278,7 +217,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     @Override
     public final IntStream flatMapToInt(Function<? super P_OUT, ? extends IntStream> mapper) {
         Objects.requireNonNull(mapper);
-        // We can do better than this, by polling cancellationRequested when stream is infinite
         return new IntPipeline.StatelessOp<P_OUT>(this, StreamShape.REFERENCE,
                                               StreamOpFlag.NOT_SORTED | StreamOpFlag.NOT_DISTINCT | StreamOpFlag.NOT_SIZED) {
             @Override
@@ -293,7 +231,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
                     @Override
                     public void accept(P_OUT u) {
                         try (IntStream result = mapper.apply(u)) {
-                            // We can do better that this too; optimize for depth=0 case and just grab spliterator and forEach it
                             if (result != null)
                                 result.sequential().forEach(downstreamAsInt);
                         }
@@ -306,7 +243,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     @Override
     public final DoubleStream flatMapToDouble(Function<? super P_OUT, ? extends DoubleStream> mapper) {
         Objects.requireNonNull(mapper);
-        // We can do better than this, by polling cancellationRequested when stream is infinite
         return new DoublePipeline.StatelessOp<P_OUT>(this, StreamShape.REFERENCE,
                                                      StreamOpFlag.NOT_SORTED | StreamOpFlag.NOT_DISTINCT | StreamOpFlag.NOT_SIZED) {
             @Override
@@ -321,7 +257,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
                     @Override
                     public void accept(P_OUT u) {
                         try (DoubleStream result = mapper.apply(u)) {
-                            // We can do better that this too; optimize for depth=0 case and just grab spliterator and forEach it
                             if (result != null)
                                 result.sequential().forEach(downstreamAsDouble);
                         }
@@ -334,7 +269,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     @Override
     public final LongStream flatMapToLong(Function<? super P_OUT, ? extends LongStream> mapper) {
         Objects.requireNonNull(mapper);
-        // We can do better than this, by polling cancellationRequested when stream is infinite
         return new LongPipeline.StatelessOp<P_OUT>(this, StreamShape.REFERENCE,
                                                    StreamOpFlag.NOT_SORTED | StreamOpFlag.NOT_DISTINCT | StreamOpFlag.NOT_SIZED) {
             @Override
@@ -349,7 +283,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
                     @Override
                     public void accept(P_OUT u) {
                         try (LongStream result = mapper.apply(u)) {
-                            // We can do better that this too; optimize for depth=0 case and just grab spliterator and forEach it
                             if (result != null)
                                 result.sequential().forEach(downstreamAsLong);
                         }
@@ -377,7 +310,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
         };
     }
 
-    // Stateful intermediate operations from Stream
 
     @Override
     public final Stream<P_OUT> distinct() {
@@ -411,7 +343,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
             return SliceOps.makeRef(this, n, -1);
     }
 
-    // Terminal operations from Stream
 
     @Override
     public void forEach(Consumer<? super P_OUT> action) {
@@ -426,13 +357,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     @Override
     @SuppressWarnings("unchecked")
     public final <A> A[] toArray(IntFunction<A[]> generator) {
-        // Since A has no relation to U (not possible to declare that A is an upper bound of U)
-        // there will be no static type checking.
-        // Therefore use a raw type and assume A == U rather than propagating the separation of A and U
-        // throughout the code-base.
-        // The runtime type of U is never checked for equality with the component type of the runtime type of A[].
-        // Runtime checking will be performed when an element is stored in A[], thus if A is not a
-        // super type of U an ArrayStoreException will be thrown.
         @SuppressWarnings("rawtypes")
         IntFunction rawGenerator = (IntFunction) generator;
         return (A[]) Nodes.flatten(evaluateToArrayNode(rawGenerator), rawGenerator)
@@ -527,36 +451,13 @@ abstract class ReferencePipeline<P_IN, P_OUT>
     }
 
 
-    //
 
-    /**
-     * Source stage of a ReferencePipeline.
-     *
-     * @param <E_IN> type of elements in the upstream source
-     * @param <E_OUT> type of elements in produced by this stage
-     * @since 1.8
-     */
     static class Head<E_IN, E_OUT> extends ReferencePipeline<E_IN, E_OUT> {
-        /**
-         * Constructor for the source stage of a Stream.
-         *
-         * @param source {@code Supplier<Spliterator>} describing the stream
-         *               source
-         * @param sourceFlags the source flags for the stream source, described
-         *                    in {@link StreamOpFlag}
-         */
         Head(Supplier<? extends Spliterator<?>> source,
              int sourceFlags, boolean parallel) {
             super(source, sourceFlags, parallel);
         }
 
-        /**
-         * Constructor for the source stage of a Stream.
-         *
-         * @param source {@code Spliterator} describing the stream source
-         * @param sourceFlags the source flags for the stream source, described
-         *                    in {@link StreamOpFlag}
-         */
         Head(Spliterator<?> source,
              int sourceFlags, boolean parallel) {
             super(source, sourceFlags, parallel);
@@ -572,7 +473,6 @@ abstract class ReferencePipeline<P_IN, P_OUT>
             throw new UnsupportedOperationException();
         }
 
-        // Optimized sequential terminal operations for the head of the pipeline
 
         @Override
         public void forEach(Consumer<? super E_OUT> action) {
@@ -595,23 +495,8 @@ abstract class ReferencePipeline<P_IN, P_OUT>
         }
     }
 
-    /**
-     * Base class for a stateless intermediate stage of a Stream.
-     *
-     * @param <E_IN> type of elements in the upstream source
-     * @param <E_OUT> type of elements in produced by this stage
-     * @since 1.8
-     */
     abstract static class StatelessOp<E_IN, E_OUT>
             extends ReferencePipeline<E_IN, E_OUT> {
-        /**
-         * Construct a new Stream by appending a stateless intermediate
-         * operation to an existing stream.
-         *
-         * @param upstream The upstream pipeline stage
-         * @param inputShape The stream shape for the upstream pipeline stage
-         * @param opFlags Operation flags for the new stage
-         */
         StatelessOp(AbstractPipeline<?, E_IN, ?> upstream,
                     StreamShape inputShape,
                     int opFlags) {
@@ -625,22 +510,8 @@ abstract class ReferencePipeline<P_IN, P_OUT>
         }
     }
 
-    /**
-     * Base class for a stateful intermediate stage of a Stream.
-     *
-     * @param <E_IN> type of elements in the upstream source
-     * @param <E_OUT> type of elements in produced by this stage
-     * @since 1.8
-     */
     abstract static class StatefulOp<E_IN, E_OUT>
             extends ReferencePipeline<E_IN, E_OUT> {
-        /**
-         * Construct a new Stream by appending a stateful intermediate operation
-         * to an existing stream.
-         * @param upstream The upstream pipeline stage
-         * @param inputShape The stream shape for the upstream pipeline stage
-         * @param opFlags Operation flags for the new stage
-         */
         StatefulOp(AbstractPipeline<?, E_IN, ?> upstream,
                    StreamShape inputShape,
                    int opFlags) {

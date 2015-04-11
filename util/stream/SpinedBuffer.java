@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 package java.util.stream;
 
 import java.util.ArrayList;
@@ -38,76 +14,25 @@ import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 import java.util.function.LongConsumer;
 
-/**
- * An ordered collection of elements.  Elements can be added, but not removed.
- * Goes through a building phase, during which elements can be added, and a
- * traversal phase, during which elements can be traversed in order but no
- * further modifications are possible.
- *
- * <p> One or more arrays are used to store elements. The use of a multiple
- * arrays has better performance characteristics than a single array used by
- * {@link ArrayList}, as when the capacity of the list needs to be increased
- * no copying of elements is required.  This is usually beneficial in the case
- * where the results will be traversed a small number of times.
- *
- * @param <E> the type of elements in this list
- * @since 1.8
- */
 class SpinedBuffer<E>
         extends AbstractSpinedBuffer
         implements Consumer<E>, Iterable<E> {
 
-    /*
-     * We optimistically hope that all the data will fit into the first chunk,
-     * so we try to avoid inflating the spine[] and priorElementCount[] arrays
-     * prematurely.  So methods must be prepared to deal with these arrays being
-     * null.  If spine is non-null, then spineIndex points to the current chunk
-     * within the spine, otherwise it is zero.  The spine and priorElementCount
-     * arrays are always the same size, and for any i <= spineIndex,
-     * priorElementCount[i] is the sum of the sizes of all the prior chunks.
-     *
-     * The curChunk pointer is always valid.  The elementIndex is the index of
-     * the next element to be written in curChunk; this may be past the end of
-     * curChunk so we have to check before writing. When we inflate the spine
-     * array, curChunk becomes the first element in it.  When we clear the
-     * buffer, we discard all chunks except the first one, which we clear,
-     * restoring it to the initial single-chunk state.
-     */
 
-    /**
-     * Chunk that we're currently writing into; may or may not be aliased with
-     * the first element of the spine.
-     */
     protected E[] curChunk;
 
-    /**
-     * All chunks, or null if there is only one chunk.
-     */
     protected E[][] spine;
 
-    /**
-     * Constructs an empty list with the specified initial capacity.
-     *
-     * @param  initialCapacity  the initial capacity of the list
-     * @throws IllegalArgumentException if the specified initial capacity
-     *         is negative
-     */
     SpinedBuffer(int initialCapacity) {
         super(initialCapacity);
         curChunk = (E[]) new Object[1 << initialChunkPower];
     }
 
-    /**
-     * Constructs an empty list with an initial capacity of sixteen.
-     */
     SpinedBuffer() {
         super();
         curChunk = (E[]) new Object[1 << initialChunkPower];
     }
 
-    /**
-     * Returns the current capacity of the buffer
-     */
     protected long capacity() {
         return (spineIndex == 0)
                ? curChunk.length
@@ -122,9 +47,6 @@ class SpinedBuffer<E>
         }
     }
 
-    /**
-     * Ensure that the buffer has at least capacity to hold the target size
-     */
     protected final void ensureCapacity(long targetSize) {
         long capacity = capacity();
         if (targetSize > capacity) {
@@ -143,22 +65,12 @@ class SpinedBuffer<E>
         }
     }
 
-    /**
-     * Force the buffer to increase its capacity.
-     */
     protected void increaseCapacity() {
         ensureCapacity(capacity() + 1);
     }
 
-    /**
-     * Retrieve the element at the specified index.
-     */
     public E get(long index) {
-        // @@@ can further optimize by caching last seen spineIndex,
-        // which is going to be right most of the time
 
-        // Casts to int are safe since the spine array index is the index minus
-        // the prior element count from the current spine
         if (spineIndex == 0) {
             if (index < elementIndex)
                 return curChunk[((int) index)];
@@ -176,10 +88,6 @@ class SpinedBuffer<E>
         throw new IndexOutOfBoundsException(Long.toString(index));
     }
 
-    /**
-     * Copy the elements, starting at the specified offset, into the specified
-     * array.
-     */
     public void copyInto(E[] array, int offset) {
         long finalOffset = offset + count();
         if (finalOffset > array.length || finalOffset < offset) {
@@ -189,7 +97,6 @@ class SpinedBuffer<E>
         if (spineIndex == 0)
             System.arraycopy(curChunk, 0, array, offset, elementIndex);
         else {
-            // full chunks
             for (int i=0; i < spineIndex; i++) {
                 System.arraycopy(spine[i], 0, array, offset, spine[i].length);
                 offset += spine[i].length;
@@ -199,10 +106,6 @@ class SpinedBuffer<E>
         }
     }
 
-    /**
-     * Create a new array using the specified array factory, and copy the
-     * elements into it.
-     */
     public E[] asArray(IntFunction<E[]> arrayFactory) {
         long size = count();
         if (size >= Nodes.MAX_ARRAY_SIZE)
@@ -236,12 +139,10 @@ class SpinedBuffer<E>
 
     @Override
     public void forEach(Consumer<? super E> consumer) {
-        // completed chunks, if any
         for (int j = 0; j < spineIndex; j++)
             for (E t : spine[j])
                 consumer.accept(t);
 
-        // current chunk
         for (int i=0; i<elementIndex; i++)
             consumer.accept(curChunk[i]);
     }
@@ -269,29 +170,17 @@ class SpinedBuffer<E>
     private static final int SPLITERATOR_CHARACTERISTICS
             = Spliterator.SIZED | Spliterator.ORDERED | Spliterator.SUBSIZED;
 
-    /**
-     * Return a {@link Spliterator} describing the contents of the buffer.
-     */
     public Spliterator<E> spliterator() {
         class Splitr implements Spliterator<E> {
-            // The current spine index
             int splSpineIndex;
 
-            // Last spine index
             final int lastSpineIndex;
 
-            // The current element index into the current spine
             int splElementIndex;
 
-            // Last spine's last element index + 1
             final int lastSpineElementFence;
 
-            // When splSpineIndex >= lastSpineIndex and
-            // splElementIndex >= lastSpineElementFence then
-            // this spliterator is fully traversed
-            // tryAdvance can set splSpineIndex > spineIndex if the last spine is full
 
-            // The current spine array
             E[] splChunk;
 
             Splitr(int firstSpineIndex, int lastSpineIndex,
@@ -310,7 +199,6 @@ class SpinedBuffer<E>
                        ? (long) lastSpineElementFence - splElementIndex
                        : // # of elements prior to end -
                        priorElementCount[lastSpineIndex] + lastSpineElementFence -
-                       // # of elements prior to current
                        priorElementCount[splSpineIndex] - splElementIndex;
             }
 
@@ -345,7 +233,6 @@ class SpinedBuffer<E>
                 if (splSpineIndex < lastSpineIndex
                     || (splSpineIndex == lastSpineIndex && splElementIndex < lastSpineElementFence)) {
                     int i = splElementIndex;
-                    // completed chunks, if any
                     for (int sp = splSpineIndex; sp < lastSpineIndex; sp++) {
                         E[] chunk = spine[sp];
                         for (; i < chunk.length; i++) {
@@ -353,13 +240,11 @@ class SpinedBuffer<E>
                         }
                         i = 0;
                     }
-                    // last (or current uncompleted) chunk
                     E[] chunk = (splSpineIndex == lastSpineIndex) ? splChunk : spine[lastSpineIndex];
                     int hElementIndex = lastSpineElementFence;
                     for (; i < hElementIndex; i++) {
                         consumer.accept(chunk[i]);
                     }
-                    // mark consumed
                     splSpineIndex = lastSpineIndex;
                     splElementIndex = lastSpineElementFence;
                 }
@@ -368,10 +253,8 @@ class SpinedBuffer<E>
             @Override
             public Spliterator<E> trySplit() {
                 if (splSpineIndex < lastSpineIndex) {
-                    // split just before last chunk (if it is full this means 50:50 split)
                     Spliterator<E> ret = new Splitr(splSpineIndex, lastSpineIndex - 1,
                                                     splElementIndex, spine[lastSpineIndex-1].length);
-                    // position to start of last chunk
                     splSpineIndex = lastSpineIndex;
                     splElementIndex = 0;
                     splChunk = spine[splSpineIndex];
@@ -395,63 +278,19 @@ class SpinedBuffer<E>
         return new Splitr(0, spineIndex, 0, elementIndex);
     }
 
-    /**
-     * An ordered collection of primitive values.  Elements can be added, but
-     * not removed. Goes through a building phase, during which elements can be
-     * added, and a traversal phase, during which elements can be traversed in
-     * order but no further modifications are possible.
-     *
-     * <p> One or more arrays are used to store elements. The use of a multiple
-     * arrays has better performance characteristics than a single array used by
-     * {@link ArrayList}, as when the capacity of the list needs to be increased
-     * no copying of elements is required.  This is usually beneficial in the case
-     * where the results will be traversed a small number of times.
-     *
-     * @param <E> the wrapper type for this primitive type
-     * @param <T_ARR> the array type for this primitive type
-     * @param <T_CONS> the Consumer type for this primitive type
-     */
     abstract static class OfPrimitive<E, T_ARR, T_CONS>
             extends AbstractSpinedBuffer implements Iterable<E> {
 
-        /*
-         * We optimistically hope that all the data will fit into the first chunk,
-         * so we try to avoid inflating the spine[] and priorElementCount[] arrays
-         * prematurely.  So methods must be prepared to deal with these arrays being
-         * null.  If spine is non-null, then spineIndex points to the current chunk
-         * within the spine, otherwise it is zero.  The spine and priorElementCount
-         * arrays are always the same size, and for any i <= spineIndex,
-         * priorElementCount[i] is the sum of the sizes of all the prior chunks.
-         *
-         * The curChunk pointer is always valid.  The elementIndex is the index of
-         * the next element to be written in curChunk; this may be past the end of
-         * curChunk so we have to check before writing. When we inflate the spine
-         * array, curChunk becomes the first element in it.  When we clear the
-         * buffer, we discard all chunks except the first one, which we clear,
-         * restoring it to the initial single-chunk state.
-         */
 
-        // The chunk we're currently writing into
         T_ARR curChunk;
 
-        // All chunks, or null if there is only one chunk
         T_ARR[] spine;
 
-        /**
-         * Constructs an empty list with the specified initial capacity.
-         *
-         * @param  initialCapacity  the initial capacity of the list
-         * @throws IllegalArgumentException if the specified initial capacity
-         *         is negative
-         */
         OfPrimitive(int initialCapacity) {
             super(initialCapacity);
             curChunk = newArray(1 << initialChunkPower);
         }
 
-        /**
-         * Constructs an empty list with an initial capacity of sixteen.
-         */
         OfPrimitive() {
             super();
             curChunk = newArray(1 << initialChunkPower);
@@ -463,16 +302,12 @@ class SpinedBuffer<E>
         @Override
         public abstract void forEach(Consumer<? super E> consumer);
 
-        /** Create a new array-of-array of the proper type and size */
         protected abstract T_ARR[] newArrayArray(int size);
 
-        /** Create a new array of the proper type and size */
         public abstract T_ARR newArray(int size);
 
-        /** Get the length of an array */
         protected abstract int arrayLength(T_ARR array);
 
-        /** Iterate an array with the provided consumer */
         protected abstract void arrayForEach(T_ARR array, int from, int to,
                                              T_CONS consumer);
 
@@ -539,7 +374,6 @@ class SpinedBuffer<E>
             if (spineIndex == 0)
                 System.arraycopy(curChunk, 0, array, offset, elementIndex);
             else {
-                // full chunks
                 for (int i=0; i < spineIndex; i++) {
                     System.arraycopy(spine[i], 0, array, offset, arrayLength(spine[i]));
                     offset += arrayLength(spine[i]);
@@ -581,34 +415,23 @@ class SpinedBuffer<E>
 
         @SuppressWarnings("overloads")
         public void forEach(T_CONS consumer) {
-            // completed chunks, if any
             for (int j = 0; j < spineIndex; j++)
                 arrayForEach(spine[j], 0, arrayLength(spine[j]), consumer);
 
-            // current chunk
             arrayForEach(curChunk, 0, elementIndex, consumer);
         }
 
         abstract class BaseSpliterator<T_SPLITR extends Spliterator.OfPrimitive<E, T_CONS, T_SPLITR>>
                 implements Spliterator.OfPrimitive<E, T_CONS, T_SPLITR> {
-            // The current spine index
             int splSpineIndex;
 
-            // Last spine index
             final int lastSpineIndex;
 
-            // The current element index into the current spine
             int splElementIndex;
 
-            // Last spine's last element index + 1
             final int lastSpineElementFence;
 
-            // When splSpineIndex >= lastSpineIndex and
-            // splElementIndex >= lastSpineElementFence then
-            // this spliterator is fully traversed
-            // tryAdvance can set splSpineIndex > spineIndex if the last spine is full
 
-            // The current spine array
             T_ARR splChunk;
 
             BaseSpliterator(int firstSpineIndex, int lastSpineIndex,
@@ -634,7 +457,6 @@ class SpinedBuffer<E>
                        ? (long) lastSpineElementFence - splElementIndex
                        : // # of elements prior to end -
                        priorElementCount[lastSpineIndex] + lastSpineElementFence -
-                       // # of elements prior to current
                        priorElementCount[splSpineIndex] - splElementIndex;
             }
 
@@ -669,16 +491,13 @@ class SpinedBuffer<E>
                 if (splSpineIndex < lastSpineIndex
                     || (splSpineIndex == lastSpineIndex && splElementIndex < lastSpineElementFence)) {
                     int i = splElementIndex;
-                    // completed chunks, if any
                     for (int sp = splSpineIndex; sp < lastSpineIndex; sp++) {
                         T_ARR chunk = spine[sp];
                         arrayForEach(chunk, i, arrayLength(chunk), consumer);
                         i = 0;
                     }
-                    // last (or current uncompleted) chunk
                     T_ARR chunk = (splSpineIndex == lastSpineIndex) ? splChunk : spine[lastSpineIndex];
                     arrayForEach(chunk, i, lastSpineElementFence, consumer);
-                    // mark consumed
                     splSpineIndex = lastSpineIndex;
                     splElementIndex = lastSpineElementFence;
                 }
@@ -687,10 +506,8 @@ class SpinedBuffer<E>
             @Override
             public T_SPLITR trySplit() {
                 if (splSpineIndex < lastSpineIndex) {
-                    // split just before last chunk (if it is full this means 50:50 split)
                     T_SPLITR ret = newSpliterator(splSpineIndex, lastSpineIndex - 1,
                                                   splElementIndex, arrayLength(spine[lastSpineIndex - 1]));
-                    // position us to start of last chunk
                     splSpineIndex = lastSpineIndex;
                     splElementIndex = 0;
                     splChunk = spine[splSpineIndex];
@@ -713,9 +530,6 @@ class SpinedBuffer<E>
         }
     }
 
-    /**
-     * An ordered collection of {@code int} values.
-     */
     static class OfInt extends SpinedBuffer.OfPrimitive<Integer, int[], IntConsumer>
             implements IntConsumer {
         OfInt() { }
@@ -766,8 +580,6 @@ class SpinedBuffer<E>
         }
 
         public int get(long index) {
-            // Casts to int are safe since the spine array index is the index minus
-            // the prior element count from the current spine
             int ch = chunkFor(index);
             if (spineIndex == 0 && ch == 0)
                 return curChunk[(int) index];
@@ -826,9 +638,6 @@ class SpinedBuffer<E>
         }
     }
 
-    /**
-     * An ordered collection of {@code long} values.
-     */
     static class OfLong extends SpinedBuffer.OfPrimitive<Long, long[], LongConsumer>
             implements LongConsumer {
         OfLong() { }
@@ -879,8 +688,6 @@ class SpinedBuffer<E>
         }
 
         public long get(long index) {
-            // Casts to int are safe since the spine array index is the index minus
-            // the prior element count from the current spine
             int ch = chunkFor(index);
             if (spineIndex == 0 && ch == 0)
                 return curChunk[(int) index];
@@ -940,9 +747,6 @@ class SpinedBuffer<E>
         }
     }
 
-    /**
-     * An ordered collection of {@code double} values.
-     */
     static class OfDouble
             extends SpinedBuffer.OfPrimitive<Double, double[], DoubleConsumer>
             implements DoubleConsumer {
@@ -994,8 +798,6 @@ class SpinedBuffer<E>
         }
 
         public double get(long index) {
-            // Casts to int are safe since the spine array index is the index minus
-            // the prior element count from the current spine
             int ch = chunkFor(index);
             if (spineIndex == 0 && ch == 0)
                 return curChunk[(int) index];

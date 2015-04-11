@@ -1,100 +1,15 @@
-/*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 package java.util;
 
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.CountedCompleter;
 
-/**
- * Helper utilities for the parallel sort methods in Arrays.parallelSort.
- *
- * For each primitive type, plus Object, we define a static class to
- * contain the Sorter and Merger implementations for that type:
- *
- * Sorter classes based mainly on CilkSort
- * <A href="http://supertech.lcs.mit.edu/cilk/"> Cilk</A>:
- * Basic algorithm:
- * if array size is small, just use a sequential quicksort (via Arrays.sort)
- *         Otherwise:
- *         1. Break array in half.
- *         2. For each half,
- *             a. break the half in half (i.e., quarters),
- *             b. sort the quarters
- *             c. merge them together
- *         3. merge together the two halves.
- *
- * One reason for splitting in quarters is that this guarantees that
- * the final sort is in the main array, not the workspace array.
- * (workspace and main swap roles on each subsort step.)  Leaf-level
- * sorts use the associated sequential sort.
- *
- * Merger classes perform merging for Sorter.  They are structured
- * such that if the underlying sort is stable (as is true for
- * TimSort), then so is the full sort.  If big enough, they split the
- * largest of the two partitions in half, find the greatest point in
- * smaller partition less than the beginning of the second half of
- * larger via binary search; and then merge in parallel the two
- * partitions.  In part to ensure tasks are triggered in
- * stability-preserving order, the current CountedCompleter design
- * requires some little tasks to serve as place holders for triggering
- * completion tasks.  These classes (EmptyCompleter and Relay) don't
- * need to keep track of the arrays, and are never themselves forked,
- * so don't hold any task state.
- *
- * The primitive class versions (FJByte... FJDouble) are
- * identical to each other except for type declarations.
- *
- * The base sequential sorts rely on non-public versions of TimSort,
- * ComparableTimSort, and DualPivotQuicksort sort methods that accept
- * temp workspace array slices that we will have already allocated, so
- * avoids redundant allocation. (Except for DualPivotQuicksort byte[]
- * sort, that does not ever use a workspace array.)
- */
-/*package*/ class ArraysParallelSortHelpers {
 
-    /*
-     * Style note: The task classes have a lot of parameters, that are
-     * stored as task fields and copied to local variables and used in
-     * compute() methods, We pack these into as few lines as possible,
-     * and hoist consistency checks among them before main loops, to
-     * reduce distraction.
-     */
-
-    /**
-     * A placeholder task for Sorters, used for the lowest
-     * quartile task, that does not need to maintain array state.
-     */
     static final class EmptyCompleter extends CountedCompleter<Void> {
         static final long serialVersionUID = 2446542900576103244L;
         EmptyCompleter(CountedCompleter<?> p) { super(p); }
         public final void compute() { }
     }
 
-    /**
-     * A trigger for secondary merge of two merges
-     */
     static final class Relay extends CountedCompleter<Void> {
         static final long serialVersionUID = 2446542900576103244L;
         final CountedCompleter<?> task;
@@ -108,7 +23,6 @@ import java.util.concurrent.CountedCompleter;
         }
     }
 
-    /** Object + Comparator support class */
     static final class FJObject {
         static final class Sorter<T> extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -230,7 +144,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJObject
 
-    /** byte support class */
     static final class FJByte {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -341,7 +254,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJByte
 
-    /** char support class */
     static final class FJChar {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -452,7 +364,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJChar
 
-    /** short support class */
     static final class FJShort {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -563,7 +474,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJShort
 
-    /** int support class */
     static final class FJInt {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -674,7 +584,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJInt
 
-    /** long support class */
     static final class FJLong {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -785,7 +694,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJLong
 
-    /** float support class */
     static final class FJFloat {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;
@@ -896,7 +804,6 @@ import java.util.concurrent.CountedCompleter;
         }
     } // FJFloat
 
-    /** double support class */
     static final class FJDouble {
         static final class Sorter extends CountedCompleter<Void> {
             static final long serialVersionUID = 2446542900576103244L;

@@ -1,35 +1,8 @@
-/*
- * Copyright (c) 2009, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.logging;
 
 import sun.util.logging.LoggingProxy;
 
-/**
- * Implementation of LoggingProxy when java.util.logging classes exist.
- */
 class LoggingProxyImpl implements LoggingProxy {
     static final LoggingProxy INSTANCE = new LoggingProxyImpl();
 
@@ -37,7 +10,6 @@ class LoggingProxyImpl implements LoggingProxy {
 
     @Override
     public Object getLogger(String name) {
-        // always create a platform logger with the resource bundle name
         return Logger.getPlatformLogger(name);
     }
 

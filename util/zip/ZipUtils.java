@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.zip;
 
@@ -34,41 +10,25 @@ import static java.util.zip.ZipConstants64.*;
 
 class ZipUtils {
 
-    // used to adjust values between Windows and java epoch
     private static final long WINDOWS_EPOCH_IN_MICROSECONDS = -11644473600000000L;
 
-    /**
-     * Converts Windows time (in microseconds, UTC/GMT) time to FileTime.
-     */
     public static final FileTime winTimeToFileTime(long wtime) {
         return FileTime.from(wtime / 10 + WINDOWS_EPOCH_IN_MICROSECONDS,
                              TimeUnit.MICROSECONDS);
     }
 
-    /**
-     * Converts FileTime to Windows time.
-     */
     public static final long fileTimeToWinTime(FileTime ftime) {
         return (ftime.to(TimeUnit.MICROSECONDS) - WINDOWS_EPOCH_IN_MICROSECONDS) * 10;
     }
 
-    /**
-     * Converts "standard Unix time"(in seconds, UTC/GMT) to FileTime
-     */
     public static final FileTime unixTimeToFileTime(long utime) {
         return FileTime.from(utime, TimeUnit.SECONDS);
     }
 
-    /**
-     * Converts FileTime to "standard Unix time".
-     */
     public static final long fileTimeToUnixTime(FileTime ftime) {
         return ftime.to(TimeUnit.SECONDS);
     }
 
-    /**
-     * Converts DOS time to Java time (number of milliseconds since epoch).
-     */
     public static long dosToJavaTime(long dtime) {
         @SuppressWarnings("deprecation") // Use of date constructor.
         Date d = new Date((int)(((dtime >> 25) & 0x7f) + 80),
@@ -80,9 +40,6 @@ class ZipUtils {
         return d.getTime();
     }
 
-    /**
-     * Converts Java time to DOS time.
-     */
     @SuppressWarnings("deprecation") // Use of date methods
     public static long javaToDosTime(long time) {
         Date d = new Date(time);
@@ -95,26 +52,14 @@ class ZipUtils {
                d.getSeconds() >> 1;
     }
 
-    /**
-     * Fetches unsigned 16-bit value from byte array at specified offset.
-     * The bytes are assumed to be in Intel (little-endian) byte order.
-     */
     public static final int get16(byte b[], int off) {
         return Byte.toUnsignedInt(b[off]) | (Byte.toUnsignedInt(b[off+1]) << 8);
     }
 
-    /**
-     * Fetches unsigned 32-bit value from byte array at specified offset.
-     * The bytes are assumed to be in Intel (little-endian) byte order.
-     */
     public static final long get32(byte b[], int off) {
         return (get16(b, off) | ((long)get16(b, off+2) << 16)) & 0xffffffffL;
     }
 
-    /**
-     * Fetches signed 64-bit value from byte array at specified offset.
-     * The bytes are assumed to be in Intel (little-endian) byte order.
-     */
     public static final long get64(byte b[], int off) {
         return get32(b, off) | (get32(b, off+4) << 32);
     }

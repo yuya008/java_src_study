@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 package java.util.stream;
 
 import java.util.ArrayList;
@@ -33,94 +9,42 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.function.IntFunction;
 
 
-/**
- * Factory methods for transforming streams into sorted streams.
- *
- * @since 1.8
- */
 final class SortedOps {
 
     private SortedOps() { }
 
-    /**
-     * Appends a "sorted" operation to the provided stream.
-     *
-     * @param <T> the type of both input and output elements
-     * @param upstream a reference stream with element type T
-     */
     static <T> Stream<T> makeRef(AbstractPipeline<?, T, ?> upstream) {
         return new OfRef<>(upstream);
     }
 
-    /**
-     * Appends a "sorted" operation to the provided stream.
-     *
-     * @param <T> the type of both input and output elements
-     * @param upstream a reference stream with element type T
-     * @param comparator the comparator to order elements by
-     */
     static <T> Stream<T> makeRef(AbstractPipeline<?, T, ?> upstream,
                                 Comparator<? super T> comparator) {
         return new OfRef<>(upstream, comparator);
     }
 
-    /**
-     * Appends a "sorted" operation to the provided stream.
-     *
-     * @param <T> the type of both input and output elements
-     * @param upstream a reference stream with element type T
-     */
     static <T> IntStream makeInt(AbstractPipeline<?, Integer, ?> upstream) {
         return new OfInt(upstream);
     }
 
-    /**
-     * Appends a "sorted" operation to the provided stream.
-     *
-     * @param <T> the type of both input and output elements
-     * @param upstream a reference stream with element type T
-     */
     static <T> LongStream makeLong(AbstractPipeline<?, Long, ?> upstream) {
         return new OfLong(upstream);
     }
 
-    /**
-     * Appends a "sorted" operation to the provided stream.
-     *
-     * @param <T> the type of both input and output elements
-     * @param upstream a reference stream with element type T
-     */
     static <T> DoubleStream makeDouble(AbstractPipeline<?, Double, ?> upstream) {
         return new OfDouble(upstream);
     }
 
-    /**
-     * Specialized subtype for sorting reference streams
-     */
     private static final class OfRef<T> extends ReferencePipeline.StatefulOp<T, T> {
-        /**
-         * Comparator used for sorting
-         */
         private final boolean isNaturalSort;
         private final Comparator<? super T> comparator;
 
-        /**
-         * Sort using natural order of {@literal <T>} which must be
-         * {@code Comparable}.
-         */
         OfRef(AbstractPipeline<?, T, ?> upstream) {
             super(upstream, StreamShape.REFERENCE,
                   StreamOpFlag.IS_ORDERED | StreamOpFlag.IS_SORTED);
             this.isNaturalSort = true;
-            // Will throw CCE when we try to sort if T is not Comparable
             this.comparator = (Comparator<? super T>) Comparator.naturalOrder();
         }
 
-        /**
-         * Sort using the provided comparator.
-         *
-         * @param comparator The comparator to be used to evaluate ordering.
-         */
         OfRef(AbstractPipeline<?, T, ?> upstream, Comparator<? super T> comparator) {
             super(upstream, StreamShape.REFERENCE,
                   StreamOpFlag.IS_ORDERED | StreamOpFlag.NOT_SORTED);
@@ -132,8 +56,6 @@ final class SortedOps {
         public Sink<T> opWrapSink(int flags, Sink<T> sink) {
             Objects.requireNonNull(sink);
 
-            // If the input is already naturally sorted and this operation
-            // also naturally sorted then this is a no-op
             if (StreamOpFlag.SORTED.isKnown(flags) && isNaturalSort)
                 return sink;
             else if (StreamOpFlag.SIZED.isKnown(flags))
@@ -146,13 +68,10 @@ final class SortedOps {
         public <P_IN> Node<T> opEvaluateParallel(PipelineHelper<T> helper,
                                                  Spliterator<P_IN> spliterator,
                                                  IntFunction<T[]> generator) {
-            // If the input is already naturally sorted and this operation
-            // naturally sorts then collect the output
             if (StreamOpFlag.SORTED.isKnown(helper.getStreamAndOpFlags()) && isNaturalSort) {
                 return helper.evaluate(spliterator, false, generator);
             }
             else {
-                // @@@ Weak two-pass parallel implementation; parallel collect, parallel sort
                 T[] flattenedData = helper.evaluate(spliterator, true, generator).asArray(generator);
                 Arrays.parallelSort(flattenedData, comparator);
                 return Nodes.node(flattenedData);
@@ -160,9 +79,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Specialized subtype for sorting int streams.
-     */
     private static final class OfInt extends IntPipeline.StatefulOp<Integer> {
         OfInt(AbstractPipeline<?, Integer, ?> upstream) {
             super(upstream, StreamShape.INT_VALUE,
@@ -199,9 +115,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Specialized subtype for sorting long streams.
-     */
     private static final class OfLong extends LongPipeline.StatefulOp<Long> {
         OfLong(AbstractPipeline<?, Long, ?> upstream) {
             super(upstream, StreamShape.LONG_VALUE,
@@ -238,9 +151,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Specialized subtype for sorting double streams.
-     */
     private static final class OfDouble extends DoublePipeline.StatefulOp<Double> {
         OfDouble(AbstractPipeline<?, Double, ?> upstream) {
             super(upstream, StreamShape.DOUBLE_VALUE,
@@ -277,32 +187,8 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Abstract {@link Sink} for implementing sort on reference streams.
-     *
-     * <p>
-     * Note: documentation below applies to reference and all primitive sinks.
-     * <p>
-     * Sorting sinks first accept all elements, buffering then into an array
-     * or a re-sizable data structure, if the size of the pipeline is known or
-     * unknown respectively.  At the end of the sink protocol those elements are
-     * sorted and then pushed downstream.
-     * This class records if {@link #cancellationRequested} is called.  If so it
-     * can be inferred that the source pushing source elements into the pipeline
-     * knows that the pipeline is short-circuiting.  In such cases sub-classes
-     * pushing elements downstream will preserve the short-circuiting protocol
-     * by calling {@code downstream.cancellationRequested()} and checking the
-     * result is {@code false} before an element is pushed.
-     * <p>
-     * Note that the above behaviour is an optimization for sorting with
-     * sequential streams.  It is not an error that more elements, than strictly
-     * required to produce a result, may flow through the pipeline.  This can
-     * occur, in general (not restricted to just sorting), for short-circuiting
-     * parallel pipelines.
-     */
     private static abstract class AbstractRefSortingSink<T> extends Sink.ChainedReference<T, T> {
         protected final Comparator<? super T> comparator;
-        // @@@ could be a lazy final value, if/when support is added
         protected boolean cancellationWasRequested;
 
         AbstractRefSortingSink(Sink<? super T> downstream, Comparator<? super T> comparator) {
@@ -310,12 +196,6 @@ final class SortedOps {
             this.comparator = comparator;
         }
 
-        /**
-         * Records is cancellation is requested so short-circuiting behaviour
-         * can be preserved when the sorted elements are pushed downstream.
-         *
-         * @return false, as this sink never short-circuits.
-         */
         @Override
         public final boolean cancellationRequested() {
             cancellationWasRequested = true;
@@ -323,9 +203,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on SIZED reference streams.
-     */
     private static final class SizedRefSortingSink<T> extends AbstractRefSortingSink<T> {
         private T[] array;
         private int offset;
@@ -363,9 +240,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on reference streams.
-     */
     private static final class RefSortingSink<T> extends AbstractRefSortingSink<T> {
         private ArrayList<T> list;
 
@@ -403,9 +277,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Abstract {@link Sink} for implementing sort on int streams.
-     */
     private static abstract class AbstractIntSortingSink extends Sink.ChainedInt<Integer> {
         protected boolean cancellationWasRequested;
 
@@ -420,9 +291,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on SIZED int streams.
-     */
     private static final class SizedIntSortingSink extends AbstractIntSortingSink {
         private int[] array;
         private int offset;
@@ -460,9 +328,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on int streams.
-     */
     private static final class IntSortingSink extends AbstractIntSortingSink {
         private SpinedBuffer.OfInt b;
 
@@ -501,9 +366,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Abstract {@link Sink} for implementing sort on long streams.
-     */
     private static abstract class AbstractLongSortingSink extends Sink.ChainedLong<Long> {
         protected boolean cancellationWasRequested;
 
@@ -518,9 +380,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on SIZED long streams.
-     */
     private static final class SizedLongSortingSink extends AbstractLongSortingSink {
         private long[] array;
         private int offset;
@@ -558,9 +417,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on long streams.
-     */
     private static final class LongSortingSink extends AbstractLongSortingSink {
         private SpinedBuffer.OfLong b;
 
@@ -599,9 +455,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * Abstract {@link Sink} for implementing sort on long streams.
-     */
     private static abstract class AbstractDoubleSortingSink extends Sink.ChainedDouble<Double> {
         protected boolean cancellationWasRequested;
 
@@ -616,9 +469,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on SIZED double streams.
-     */
     private static final class SizedDoubleSortingSink extends AbstractDoubleSortingSink {
         private double[] array;
         private int offset;
@@ -656,9 +506,6 @@ final class SortedOps {
         }
     }
 
-    /**
-     * {@link Sink} for implementing sort on double streams.
-     */
     private static final class DoubleSortingSink extends AbstractDoubleSortingSink {
         private SpinedBuffer.OfDouble b;
 

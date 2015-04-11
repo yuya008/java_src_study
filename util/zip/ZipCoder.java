@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2009, 2011, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.zip;
 
@@ -37,9 +13,6 @@ import java.util.Arrays;
 import sun.nio.cs.ArrayDecoder;
 import sun.nio.cs.ArrayEncoder;
 
-/**
- * Utility class for zipfile name and comment decoding and encoding
- */
 
 final class ZipCoder {
 
@@ -49,9 +22,6 @@ final class ZipCoder {
         char[] ca = new char[len];
         if (len == 0)
             return new String(ca);
-        // UTF-8 only for now. Other ArrayDeocder only handles
-        // CodingErrorAction.REPLACE mode. ZipCoder uses
-        // REPORT mode.
         if (isUTF8 && cd instanceof ArrayDecoder) {
             int clen = ((ArrayDecoder)cd).decode(ba, 0, length, ca);
             if (clen == -1)    // malformed
@@ -80,8 +50,6 @@ final class ZipCoder {
         byte[] ba = new byte[len];
         if (len == 0)
             return ba;
-        // UTF-8 only for now. Other ArrayDeocder only handles
-        // CodingErrorAction.REPLACE mode.
         if (isUTF8 && ce instanceof ArrayEncoder) {
             int blen = ((ArrayEncoder)ce).encode(ca, 0, ca.length, ba);
             if (blen == -1)    // malformed
@@ -102,7 +70,6 @@ final class ZipCoder {
             return Arrays.copyOf(ba, bb.position());
     }
 
-    // assume invoked only if "this" is not utf8
     byte[] getBytesUTF8(String s) {
         if (isUTF8)
             return getBytes(s);

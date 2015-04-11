@@ -1,37 +1,4 @@
-/*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
-/*
- *
- *
- *
- *
- *
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
- */
 
 package java.util.concurrent;
 import java.util.function.Supplier;
@@ -53,110 +20,9 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
-/**
- * A {@link Future} that may be explicitly completed (setting its
- * value and status), and may be used as a {@link CompletionStage},
- * supporting dependent functions and actions that trigger upon its
- * completion.
- *
- * <p>When two or more threads attempt to
- * {@link #complete complete},
- * {@link #completeExceptionally completeExceptionally}, or
- * {@link #cancel cancel}
- * a CompletableFuture, only one of them succeeds.
- *
- * <p>In addition to these and related methods for directly
- * manipulating status and results, CompletableFuture implements
- * interface {@link CompletionStage} with the following policies: <ul>
- *
- * <li>Actions supplied for dependent completions of
- * <em>non-async</em> methods may be performed by the thread that
- * completes the current CompletableFuture, or by any other caller of
- * a completion method.</li>
- *
- * <li>All <em>async</em> methods without an explicit Executor
- * argument are performed using the {@link ForkJoinPool#commonPool()}
- * (unless it does not support a parallelism level of at least two, in
- * which case, a new Thread is used). To simplify monitoring,
- * debugging, and tracking, all generated asynchronous tasks are
- * instances of the marker interface {@link
- * AsynchronousCompletionTask}. </li>
- *
- * <li>All CompletionStage methods are implemented independently of
- * other public methods, so the behavior of one method is not impacted
- * by overrides of others in subclasses.  </li> </ul>
- *
- * <p>CompletableFuture also implements {@link Future} with the following
- * policies: <ul>
- *
- * <li>Since (unlike {@link FutureTask}) this class has no direct
- * control over the computation that causes it to be completed,
- * cancellation is treated as just another form of exceptional
- * completion.  Method {@link #cancel cancel} has the same effect as
- * {@code completeExceptionally(new CancellationException())}. Method
- * {@link #isCompletedExceptionally} can be used to determine if a
- * CompletableFuture completed in any exceptional fashion.</li>
- *
- * <li>In case of exceptional completion with a CompletionException,
- * methods {@link #get()} and {@link #get(long, TimeUnit)} throw an
- * {@link ExecutionException} with the same cause as held in the
- * corresponding CompletionException.  To simplify usage in most
- * contexts, this class also defines methods {@link #join()} and
- * {@link #getNow} that instead throw the CompletionException directly
- * in these cases.</li> </ul>
- *
- * @author Doug Lea
- * @since 1.8
- */
 public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
-    /*
-     * Overview:
-     *
-     * 1. Non-nullness of field result (set via CAS) indicates done.
-     * An AltResult is used to box null as a result, as well as to
-     * hold exceptions.  Using a single field makes completion fast
-     * and simple to detect and trigger, at the expense of a lot of
-     * encoding and decoding that infiltrates many methods. One minor
-     * simplification relies on the (static) NIL (to box null results)
-     * being the only AltResult with a null exception field, so we
-     * don't usually need explicit comparisons with NIL. The CF
-     * exception propagation mechanics surrounding decoding rely on
-     * unchecked casts of decoded results really being unchecked,
-     * where user type errors are caught at point of use, as is
-     * currently the case in Java. These are highlighted by using
-     * SuppressWarnings-annotated temporaries.
-     *
-     * 2. Waiters are held in a Treiber stack similar to the one used
-     * in FutureTask, Phaser, and SynchronousQueue. See their
-     * internal documentation for algorithmic details.
-     *
-     * 3. Completions are also kept in a list/stack, and pulled off
-     * and run when completion is triggered. (We could even use the
-     * same stack as for waiters, but would give up the potential
-     * parallelism obtained because woken waiters help release/run
-     * others -- see method postComplete).  Because post-processing
-     * may race with direct calls, class Completion opportunistically
-     * extends AtomicInteger so callers can claim the action via
-     * compareAndSet(0, 1).  The Completion.run methods are all
-     * written a boringly similar uniform way (that sometimes includes
-     * unnecessary-looking checks, kept to maintain uniformity).
-     * There are enough dimensions upon which they differ that
-     * attempts to factor commonalities while maintaining efficiency
-     * require more lines of code than they would save.
-     *
-     * 4. The exported then/and/or methods do support a bit of
-     * factoring (see doThenApply etc). They must cope with the
-     * intrinsic races surrounding addition of a dependent action
-     * versus performing the action directly because the task is
-     * already complete.  For example, a CF may not be complete upon
-     * entry, so a dependent completion is added, but by the time it
-     * is added, the target CF is complete, so must be directly
-     * executed. This is all done while avoiding unnecessary object
-     * construction in safe-bypass cases.
-     */
 
-    // preliminaries
 
     static final class AltResult {
         final Throwable ex; // null only for NIL
@@ -165,17 +31,12 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
     static final AltResult NIL = new AltResult(null);
 
-    // Fields
 
     volatile Object result;    // Either the result or boxed AltResult
     volatile WaitNode waiters; // Treiber stack of threads blocked on get()
     volatile CompletionNode completions; // list (Treiber stack) of completions
 
-    // Basic utilities for triggering and processing completions
 
-    /**
-     * Removes and signals all waiting threads and runs all completions.
-     */
     final void postComplete() {
         WaitNode q; Thread t;
         while ((q = waiters) != null) {
@@ -194,12 +55,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /**
-     * Triggers completion with the encoding of the given arguments:
-     * if the exception is non-null, encodes it as a wrapped
-     * CompletionException unless it is one already.  Otherwise uses
-     * the given result, boxed as NIL if null.
-     */
     final void internalComplete(T v, Throwable ex) {
         if (result == null)
             UNSAFE.compareAndSwapObject
@@ -210,32 +65,16 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         postComplete(); // help out even if not triggered
     }
 
-    /**
-     * If triggered, helps release and/or process completions.
-     */
     final void helpPostComplete() {
         if (result != null)
             postComplete();
     }
 
-    /* ------------- waiting for completions -------------- */
 
-    /** Number of processors, for spin control */
     static final int NCPU = Runtime.getRuntime().availableProcessors();
 
-    /**
-     * Heuristic spin value for waitingGet() before blocking on
-     * multiprocessors
-     */
     static final int SPINS = (NCPU > 1) ? 1 << 8 : 0;
 
-    /**
-     * Linked nodes to record waiting threads in a Treiber stack.  See
-     * other classes such as Phaser and SynchronousQueue for more
-     * detailed explanation. This class implements ManagedBlocker to
-     * avoid starvation when blocking actions pile up in
-     * ForkJoinPools.
-     */
     static final class WaitNode implements ForkJoinPool.ManagedBlocker {
         long nanos;          // wait time if timed
         final long deadline; // non-zero if timed
@@ -275,10 +114,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /**
-     * Returns raw result after waiting, or null if interruptible and
-     * interrupted.
-     */
     private Object waitingGet(boolean interruptible) {
         WaitNode q = null;
         boolean queued = false;
@@ -324,12 +159,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /**
-     * Awaits completion or aborts on interrupt or timeout.
-     *
-     * @param nanos time to wait
-     * @return raw result
-     */
     private Object timedAwaitDone(long nanos)
         throws InterruptedException, TimeoutException {
         WaitNode q = null;
@@ -375,16 +204,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /**
-     * Tries to unlink a timed-out or interrupted wait node to avoid
-     * accumulating garbage.  Internal nodes are simply unspliced
-     * without CAS since it is harmless if they are traversed anyway
-     * by releasers.  To avoid effects of unsplicing from already
-     * removed nodes, the list is retraversed in case of an apparent
-     * race.  This is slow when there are a lot of nodes, but we don't
-     * expect lists to be long enough to outweigh higher-overhead
-     * schemes.
-     */
     private void removeWaiter(WaitNode node) {
         if (node != null) {
             node.thread = null;
@@ -407,19 +226,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /* ------------- Async tasks -------------- */
 
-    /**
-     * A marker interface identifying asynchronous tasks produced by
-     * {@code async} methods. This may be useful for monitoring,
-     * debugging, and tracking asynchronous activities.
-     *
-     * @since 1.8
-     */
     public static interface AsynchronousCompletionTask {
     }
 
-    /** Base class can act as either FJ or plain Runnable */
     @SuppressWarnings("serial")
     abstract static class Async extends ForkJoinTask<Void>
         implements Runnable, AsynchronousCompletionTask {
@@ -428,11 +238,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         public final void run() { exec(); }
     }
 
-    /**
-     * Starts the given async task using the given executor, unless
-     * the executor is ForkJoinPool.commonPool and it has been
-     * disabled, in which case starts a new thread.
-     */
     static void execAsync(Executor e, Async r) {
         if (e == ForkJoinPool.commonPool() &&
             ForkJoinPool.getCommonPoolParallelism() <= 1)
@@ -657,21 +462,13 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         private static final long serialVersionUID = 5232453952276885070L;
     }
 
-    /* ------------- Completions -------------- */
 
-    /**
-     * Simple linked list nodes to record completions, used in
-     * basically the same way as WaitNodes. (We separate nodes from
-     * the Completions themselves mainly because for the And and Or
-     * methods, the same Completion object resides in two lists.)
-     */
     static final class CompletionNode {
         final Completion completion;
         volatile CompletionNode next;
         CompletionNode(Completion completion) { this.completion = completion; }
     }
 
-    // Opportunistically subclass AtomicInteger to use compareAndSet to claim.
     @SuppressWarnings("serial")
     abstract static class Completion extends AtomicInteger implements Runnable {
     }
@@ -1336,7 +1133,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         private static final long serialVersionUID = 5232453952276885070L;
     }
 
-    // version of ThenCopy for CompletableFuture<Void> dst
     static final class ThenPropagate extends Completion {
         final CompletableFuture<?> src;
         final CompletableFuture<Void> dst;
@@ -1492,7 +1288,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         private static final long serialVersionUID = 5232453952276885070L;
     }
 
-    // Implementations of stage methods with (plain, async, Executor) forms
 
     private <U> CompletableFuture<U> doThenApply
         (Function<? super T,? extends U> fn,
@@ -2105,24 +1900,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
 
-    // public methods
 
-    /**
-     * Creates a new incomplete CompletableFuture.
-     */
     public CompletableFuture() {
     }
 
-    /**
-     * Returns a new CompletableFuture that is asynchronously completed
-     * by a task running in the {@link ForkJoinPool#commonPool()} with
-     * the value obtained by calling the given Supplier.
-     *
-     * @param supplier a function returning the value to be used
-     * to complete the returned CompletableFuture
-     * @param <U> the function's return type
-     * @return the new CompletableFuture
-     */
     public static <U> CompletableFuture<U> supplyAsync(Supplier<U> supplier) {
         if (supplier == null) throw new NullPointerException();
         CompletableFuture<U> f = new CompletableFuture<U>();
@@ -2130,17 +1911,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return f;
     }
 
-    /**
-     * Returns a new CompletableFuture that is asynchronously completed
-     * by a task running in the given executor with the value obtained
-     * by calling the given Supplier.
-     *
-     * @param supplier a function returning the value to be used
-     * to complete the returned CompletableFuture
-     * @param executor the executor to use for asynchronous execution
-     * @param <U> the function's return type
-     * @return the new CompletableFuture
-     */
     public static <U> CompletableFuture<U> supplyAsync(Supplier<U> supplier,
                                                        Executor executor) {
         if (executor == null || supplier == null)
@@ -2150,15 +1920,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return f;
     }
 
-    /**
-     * Returns a new CompletableFuture that is asynchronously completed
-     * by a task running in the {@link ForkJoinPool#commonPool()} after
-     * it runs the given action.
-     *
-     * @param runnable the action to run before completing the
-     * returned CompletableFuture
-     * @return the new CompletableFuture
-     */
     public static CompletableFuture<Void> runAsync(Runnable runnable) {
         if (runnable == null) throw new NullPointerException();
         CompletableFuture<Void> f = new CompletableFuture<Void>();
@@ -2166,16 +1927,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return f;
     }
 
-    /**
-     * Returns a new CompletableFuture that is asynchronously completed
-     * by a task running in the given executor after it runs the given
-     * action.
-     *
-     * @param runnable the action to run before completing the
-     * returned CompletableFuture
-     * @param executor the executor to use for asynchronous execution
-     * @return the new CompletableFuture
-     */
     public static CompletableFuture<Void> runAsync(Runnable runnable,
                                                    Executor executor) {
         if (executor == null || runnable == null)
@@ -2185,40 +1936,16 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return f;
     }
 
-    /**
-     * Returns a new CompletableFuture that is already completed with
-     * the given value.
-     *
-     * @param value the value
-     * @param <U> the type of the value
-     * @return the completed CompletableFuture
-     */
     public static <U> CompletableFuture<U> completedFuture(U value) {
         CompletableFuture<U> f = new CompletableFuture<U>();
         f.result = (value == null) ? NIL : value;
         return f;
     }
 
-    /**
-     * Returns {@code true} if completed in any fashion: normally,
-     * exceptionally, or via cancellation.
-     *
-     * @return {@code true} if completed
-     */
     public boolean isDone() {
         return result != null;
     }
 
-    /**
-     * Waits if necessary for this future to complete, and then
-     * returns its result.
-     *
-     * @return the result value
-     * @throws CancellationException if this future was cancelled
-     * @throws ExecutionException if this future completed exceptionally
-     * @throws InterruptedException if the current thread was interrupted
-     * while waiting
-     */
     public T get() throws InterruptedException, ExecutionException {
         Object r; Throwable ex, cause;
         if ((r = result) == null && (r = waitingGet(true)) == null)
@@ -2237,19 +1964,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         throw new ExecutionException(ex);
     }
 
-    /**
-     * Waits if necessary for at most the given time for this future
-     * to complete, and then returns its result, if available.
-     *
-     * @param timeout the maximum time to wait
-     * @param unit the time unit of the timeout argument
-     * @return the result value
-     * @throws CancellationException if this future was cancelled
-     * @throws ExecutionException if this future completed exceptionally
-     * @throws InterruptedException if the current thread was interrupted
-     * while waiting
-     * @throws TimeoutException if the wait timed out
-     */
     public T get(long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException {
         Object r; Throwable ex, cause;
@@ -2272,20 +1986,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         throw new ExecutionException(ex);
     }
 
-    /**
-     * Returns the result value when complete, or throws an
-     * (unchecked) exception if completed exceptionally. To better
-     * conform with the use of common functional forms, if a
-     * computation involved in the completion of this
-     * CompletableFuture threw an exception, this method throws an
-     * (unchecked) {@link CompletionException} with the underlying
-     * exception as its cause.
-     *
-     * @return the result value
-     * @throws CancellationException if the computation was cancelled
-     * @throws CompletionException if this future completed
-     * exceptionally or a completion computation threw an exception
-     */
     public T join() {
         Object r; Throwable ex;
         if ((r = result) == null)
@@ -2303,16 +2003,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         throw new CompletionException(ex);
     }
 
-    /**
-     * Returns the result value (or throws any encountered exception)
-     * if completed, else returns the given valueIfAbsent.
-     *
-     * @param valueIfAbsent the value to return if not completed
-     * @return the result value, if completed, else the given valueIfAbsent
-     * @throws CancellationException if the computation was cancelled
-     * @throws CompletionException if this future completed
-     * exceptionally or a completion computation threw an exception
-     */
     public T getNow(T valueIfAbsent) {
         Object r; Throwable ex;
         if ((r = result) == null)
@@ -2330,14 +2020,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         throw new CompletionException(ex);
     }
 
-    /**
-     * If not already completed, sets the value returned by {@link
-     * #get()} and related methods to the given value.
-     *
-     * @param value the result value
-     * @return {@code true} if this invocation caused this CompletableFuture
-     * to transition to a completed state, else {@code false}
-     */
     public boolean complete(T value) {
         boolean triggered = result == null &&
             UNSAFE.compareAndSwapObject(this, RESULT, null,
@@ -2346,14 +2028,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return triggered;
     }
 
-    /**
-     * If not already completed, causes invocations of {@link #get()}
-     * and related methods to throw the given exception.
-     *
-     * @param ex the exception
-     * @return {@code true} if this invocation caused this CompletableFuture
-     * to transition to a completed state, else {@code false}
-     */
     public boolean completeExceptionally(Throwable ex) {
         if (ex == null) throw new NullPointerException();
         boolean triggered = result == null &&
@@ -2362,7 +2036,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return triggered;
     }
 
-    // CompletionStage methods
 
     public <U> CompletableFuture<U> thenApply
         (Function<? super T,? extends U> fn) {
@@ -2592,32 +2265,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return doHandle(fn, executor);
     }
 
-    /**
-     * Returns this CompletableFuture
-     *
-     * @return this CompletableFuture
-     */
     public CompletableFuture<T> toCompletableFuture() {
         return this;
     }
 
-    // not in interface CompletionStage
 
-    /**
-     * Returns a new CompletableFuture that is completed when this
-     * CompletableFuture completes, with the result of the given
-     * function of the exception triggering this CompletableFuture's
-     * completion when it completes exceptionally; otherwise, if this
-     * CompletableFuture completes normally, then the returned
-     * CompletableFuture also completes normally with the same value.
-     * Note: More flexible versions of this functionality are
-     * available using methods {@code whenComplete} and {@code handle}.
-     *
-     * @param fn the function to use to compute the value of the
-     * returned CompletableFuture if this CompletableFuture completed
-     * exceptionally
-     * @return the new CompletableFuture
-     */
     public CompletableFuture<T> exceptionally
         (Function<Throwable, ? extends T> fn) {
         if (fn == null) throw new NullPointerException();
@@ -2655,38 +2307,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return dst;
     }
 
-    /* ------------- Arbitrary-arity constructions -------------- */
 
-    /*
-     * The basic plan of attack is to recursively form binary
-     * completion trees of elements. This can be overkill for small
-     * sets, but scales nicely. The And/All vs Or/Any forms use the
-     * same idea, but details differ.
-     */
 
-    /**
-     * Returns a new CompletableFuture that is completed when all of
-     * the given CompletableFutures complete.  If any of the given
-     * CompletableFutures complete exceptionally, then the returned
-     * CompletableFuture also does so, with a CompletionException
-     * holding this exception as its cause.  Otherwise, the results,
-     * if any, of the given CompletableFutures are not reflected in
-     * the returned CompletableFuture, but may be obtained by
-     * inspecting them individually. If no CompletableFutures are
-     * provided, returns a CompletableFuture completed with the value
-     * {@code null}.
-     *
-     * <p>Among the applications of this method is to await completion
-     * of a set of independent CompletableFutures before continuing a
-     * program, as in: {@code CompletableFuture.allOf(c1, c2,
-     * c3).join();}.
-     *
-     * @param cfs the CompletableFutures
-     * @return a new CompletableFuture that is completed when all of the
-     * given CompletableFutures complete
-     * @throws NullPointerException if the array or any of its elements are
-     * {@code null}
-     */
     public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs) {
         int len = cfs.length; // Directly handle empty and singleton cases
         if (len > 1)
@@ -2720,10 +2342,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /**
-     * Recursively constructs an And'ed tree of CompletableFutures.
-     * Called only when array known to have at least two elements.
-     */
     private static CompletableFuture<Void> allTree(CompletableFuture<?>[] cfs,
                                                    int lo, int hi) {
         CompletableFuture<?> fst, snd;
@@ -2766,21 +2384,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return dst;
     }
 
-    /**
-     * Returns a new CompletableFuture that is completed when any of
-     * the given CompletableFutures complete, with the same result.
-     * Otherwise, if it completed exceptionally, the returned
-     * CompletableFuture also does so, with a CompletionException
-     * holding this exception as its cause.  If no CompletableFutures
-     * are provided, returns an incomplete CompletableFuture.
-     *
-     * @param cfs the CompletableFutures
-     * @return a new CompletableFuture that is completed with the
-     * result or exception of any of the given CompletableFutures when
-     * one completes
-     * @throws NullPointerException if the array or any of its elements are
-     * {@code null}
-     */
     public static CompletableFuture<Object> anyOf(CompletableFuture<?>... cfs) {
         int len = cfs.length; // Same idea as allOf
         if (len > 1)
@@ -2823,9 +2426,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
     }
 
-    /**
-     * Recursively constructs an Or'ed tree of CompletableFutures.
-     */
     private static CompletableFuture<Object> anyTree(CompletableFuture<?>[] cfs,
                                                      int lo, int hi) {
         CompletableFuture<?> fst, snd;
@@ -2870,21 +2470,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return dst;
     }
 
-    /* ------------- Control and status methods -------------- */
 
-    /**
-     * If not already completed, completes this CompletableFuture with
-     * a {@link CancellationException}. Dependent CompletableFutures
-     * that have not already completed will also complete
-     * exceptionally, with a {@link CompletionException} caused by
-     * this {@code CancellationException}.
-     *
-     * @param mayInterruptIfRunning this value has no effect in this
-     * implementation because interrupts are not used to control
-     * processing.
-     *
-     * @return {@code true} if this task is now cancelled
-     */
     public boolean cancel(boolean mayInterruptIfRunning) {
         boolean cancelled = (result == null) &&
             UNSAFE.compareAndSwapObject
@@ -2893,73 +2479,28 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return cancelled || isCancelled();
     }
 
-    /**
-     * Returns {@code true} if this CompletableFuture was cancelled
-     * before it completed normally.
-     *
-     * @return {@code true} if this CompletableFuture was cancelled
-     * before it completed normally
-     */
     public boolean isCancelled() {
         Object r;
         return ((r = result) instanceof AltResult) &&
             (((AltResult)r).ex instanceof CancellationException);
     }
 
-    /**
-     * Returns {@code true} if this CompletableFuture completed
-     * exceptionally, in any way. Possible causes include
-     * cancellation, explicit invocation of {@code
-     * completeExceptionally}, and abrupt termination of a
-     * CompletionStage action.
-     *
-     * @return {@code true} if this CompletableFuture completed
-     * exceptionally
-     */
     public boolean isCompletedExceptionally() {
         Object r;
         return ((r = result) instanceof AltResult) && r != NIL;
     }
 
-    /**
-     * Forcibly sets or resets the value subsequently returned by
-     * method {@link #get()} and related methods, whether or not
-     * already completed. This method is designed for use only in
-     * error recovery actions, and even in such situations may result
-     * in ongoing dependent completions using established versus
-     * overwritten outcomes.
-     *
-     * @param value the completion value
-     */
     public void obtrudeValue(T value) {
         result = (value == null) ? NIL : value;
         postComplete();
     }
 
-    /**
-     * Forcibly causes subsequent invocations of method {@link #get()}
-     * and related methods to throw the given exception, whether or
-     * not already completed. This method is designed for use only in
-     * recovery actions, and even in such situations may result in
-     * ongoing dependent completions using established versus
-     * overwritten outcomes.
-     *
-     * @param ex the exception
-     */
     public void obtrudeException(Throwable ex) {
         if (ex == null) throw new NullPointerException();
         result = new AltResult(ex);
         postComplete();
     }
 
-    /**
-     * Returns the estimated number of CompletableFutures whose
-     * completions are awaiting completion of this CompletableFuture.
-     * This method is designed for use in monitoring system state, not
-     * for synchronization control.
-     *
-     * @return the number of dependent CompletableFutures
-     */
     public int getNumberOfDependents() {
         int count = 0;
         for (CompletionNode p = completions; p != null; p = p.next)
@@ -2967,16 +2508,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return count;
     }
 
-    /**
-     * Returns a string identifying this CompletableFuture, as well as
-     * its completion state.  The state, in brackets, contains the
-     * String {@code "Completed Normally"} or the String {@code
-     * "Completed Exceptionally"}, or the String {@code "Not
-     * completed"} followed by the number of CompletableFutures
-     * dependent upon its completion, if any.
-     *
-     * @return a string identifying this CompletableFuture, as well as its state
-     */
     public String toString() {
         Object r = result;
         int count;
@@ -2990,7 +2521,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
               "[Completed normally]"));
     }
 
-    // Unsafe mechanics
     private static final sun.misc.Unsafe UNSAFE;
     private static final long RESULT;
     private static final long WAITERS;

@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 package java.util;
 
 import java.io.Serializable;
@@ -31,19 +7,11 @@ import java.util.function.ToDoubleFunction;
 import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
-/**
- * Package private supporting class for {@link Comparator}.
- */
 class Comparators {
     private Comparators() {
         throw new AssertionError("no instances");
     }
 
-    /**
-     * Compares {@link Comparable} objects in natural order.
-     *
-     * @see Comparable
-     */
     enum NaturalOrderComparator implements Comparator<Comparable<Object>> {
         INSTANCE;
 
@@ -58,13 +26,9 @@ class Comparators {
         }
     }
 
-    /**
-     * Null-friendly comparators
-     */
     final static class NullComparator<T> implements Comparator<T>, Serializable {
         private static final long serialVersionUID = -7569533591570686392L;
         private final boolean nullFirst;
-        // if null, non-null Ts are considered equal
         private final Comparator<T> real;
 
         @SuppressWarnings("unchecked")

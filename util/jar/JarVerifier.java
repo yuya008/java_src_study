@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.jar;
 
@@ -38,59 +14,36 @@ import sun.security.util.ManifestEntryVerifier;
 import sun.security.util.SignatureFileVerifier;
 import sun.security.util.Debug;
 
-/**
- *
- * @author      Roland Schemers
- */
 class JarVerifier {
 
-    /* Are we debugging ? */
     static final Debug debug = Debug.getInstance("jar");
 
-    /* a table mapping names to code signers, for jar entries that have
-       had their actual hashes verified */
     private Hashtable<String, CodeSigner[]> verifiedSigners;
 
-    /* a table mapping names to code signers, for jar entries that have
-       passed the .SF/.DSA/.EC -> MANIFEST check */
     private Hashtable<String, CodeSigner[]> sigFileSigners;
 
-    /* a hash table to hold .SF bytes */
     private Hashtable<String, byte[]> sigFileData;
 
-    /** "queue" of pending PKCS7 blocks that we couldn't parse
-     *  until we parsed the .SF file */
     private ArrayList<SignatureFileVerifier> pendingBlocks;
 
-    /* cache of CodeSigner objects */
     private ArrayList<CodeSigner[]> signerCache;
 
-    /* Are we parsing a block? */
     private boolean parsingBlockOrSF = false;
 
-    /* Are we done parsing META-INF entries? */
     private boolean parsingMeta = true;
 
-    /* Are there are files to verify? */
     private boolean anyToVerify = true;
 
-    /* The output stream to use when keeping track of files we are interested
-       in */
     private ByteArrayOutputStream baos;
 
-    /** The ManifestDigester object */
     private volatile ManifestDigester manDig;
 
-    /** the bytes for the manDig object */
     byte manifestRawBytes[] = null;
 
-    /** controls eager signature validation */
     boolean eagerValidation;
 
-    /** makes code source singleton instances unique to us */
     private Object csdomain = new Object();
 
-    /** collect -DIGEST-MANIFEST values for blacklist */
     private List<Object> manifestDigests;
 
     public JarVerifier(byte rawBytes[]) {
@@ -103,11 +56,6 @@ class JarVerifier {
         manifestDigests = new ArrayList<>();
     }
 
-    /**
-     * This method scans to see which entry we're parsing and
-     * keeps various state information depending on what type of
-     * file is being parsed.
-     */
     public void beginEntry(JarEntry je, ManifestEntryVerifier mev)
         throws IOException
     {
@@ -120,15 +68,6 @@ class JarVerifier {
 
         String name = je.getName();
 
-        /*
-         * Assumptions:
-         * 1. The manifest should be the first entry in the META-INF directory.
-         * 2. The .SF/.DSA/.EC files follow the manifest, before any normal entries
-         * 3. Any of the following will throw a SecurityException:
-         *    a. digest mismatch between a manifest section and
-         *       the SF section.
-         *    b. digest mismatch between the actual jar entry and the manifest
-         */
 
         if (parsingMeta) {
             String uname = name.toUpperCase(Locale.ENGLISH);
@@ -146,16 +85,12 @@ class JarVerifier {
                 }
 
                 if (SignatureFileVerifier.isBlockOrSF(uname)) {
-                    /* We parse only DSA, RSA or EC PKCS7 blocks. */
                     parsingBlockOrSF = true;
                     baos.reset();
                     mev.setEntry(null, je);
                     return;
                 }
 
-                // If a META-INF entry is not MF or block or SF, they should
-                // be normal entries. According to 2 above, no more block or
-                // SF will appear. Let's doneWithMeta.
             }
         }
 
@@ -168,33 +103,23 @@ class JarVerifier {
             return;
         }
 
-        // be liberal in what you accept. If the name starts with ./, remove
-        // it as we internally canonicalize it with out the ./.
         if (name.startsWith("./"))
             name = name.substring(2);
 
-        // be liberal in what you accept. If the name starts with /, remove
-        // it as we internally canonicalize it with out the /.
         if (name.startsWith("/"))
             name = name.substring(1);
 
-        // only set the jev object for entries that have a signature
-        // (either verified or not)
         if (sigFileSigners.get(name) != null ||
                 verifiedSigners.get(name) != null) {
             mev.setEntry(name, je);
             return;
         }
 
-        // don't compute the digest for this entry
         mev.setEntry(null, je);
 
         return;
     }
 
-    /**
-     * update a single byte.
-     */
 
     public void update(int b, ManifestEntryVerifier mev)
         throws IOException
@@ -210,9 +135,6 @@ class JarVerifier {
         }
     }
 
-    /**
-     * update an array of bytes.
-     */
 
     public void update(int n, byte[] b, int off, int len,
                        ManifestEntryVerifier mev)
@@ -229,9 +151,6 @@ class JarVerifier {
         }
     }
 
-    /**
-     * called when we reach the end of entry in one of the read() methods.
-     */
     private void processEntry(ManifestEntryVerifier mev)
         throws IOException
     {
@@ -256,10 +175,7 @@ class JarVerifier {
                 if (uname.endsWith(".SF")) {
                     String key = uname.substring(0, uname.length()-3);
                     byte bytes[] = baos.toByteArray();
-                    // add to sigFileData in case future blocks need it
                     sigFileData.put(key, bytes);
-                    // check pending blocks, we can now process
-                    // anyone waiting for this .SF file
                     Iterator<SignatureFileVerifier> it = pendingBlocks.iterator();
                     while (it.hasNext()) {
                         SignatureFileVerifier sfv = it.next();
@@ -276,7 +192,6 @@ class JarVerifier {
                     return;
                 }
 
-                // now we are parsing a signature block file
 
                 String key = uname.substring(0, uname.lastIndexOf("."));
 
@@ -297,13 +212,9 @@ class JarVerifier {
                                             manDig, uname, baos.toByteArray());
 
                 if (sfv.needSignatureFileBytes()) {
-                    // see if we have already parsed an external .SF file
                     byte[] bytes = sigFileData.get(key);
 
                     if (bytes == null) {
-                        // put this block on queue for later processing
-                        // since we don't have the .SF bytes yet
-                        // (uname, block);
                         if (debug != null) {
                             debug.println("adding pending block");
                         }
@@ -316,27 +227,17 @@ class JarVerifier {
                 sfv.process(sigFileSigners, manifestDigests);
 
             } catch (IOException ioe) {
-                // e.g. sun.security.pkcs.ParsingException
                 if (debug != null) debug.println("processEntry caught: "+ioe);
-                // ignore and treat as unsigned
             } catch (SignatureException se) {
                 if (debug != null) debug.println("processEntry caught: "+se);
-                // ignore and treat as unsigned
             } catch (NoSuchAlgorithmException nsae) {
                 if (debug != null) debug.println("processEntry caught: "+nsae);
-                // ignore and treat as unsigned
             } catch (CertificateException ce) {
                 if (debug != null) debug.println("processEntry caught: "+ce);
-                // ignore and treat as unsigned
             }
         }
     }
 
-    /**
-     * Return an array of java.security.cert.Certificate objects for
-     * the given file in the jar.
-     * @deprecated
-     */
     @Deprecated
     public java.security.cert.Certificate[] getCerts(String name)
     {
@@ -348,11 +249,6 @@ class JarVerifier {
         return mapSignersToCertArray(getCodeSigners(jar, entry));
     }
 
-    /**
-     * return an array of CodeSigner objects for
-     * the given file in the jar. this array is not cloned.
-     *
-     */
     public CodeSigner[] getCodeSigners(String name)
     {
         return verifiedSigners.get(name);
@@ -362,10 +258,6 @@ class JarVerifier {
     {
         String name = entry.getName();
         if (eagerValidation && sigFileSigners.get(name) != null) {
-            /*
-             * Force a read of the entry data to generate the
-             * verification hash.
-             */
             try {
                 InputStream s = jar.getInputStream(entry);
                 byte[] buffer = new byte[1024];
@@ -380,10 +272,6 @@ class JarVerifier {
         return getCodeSigners(name);
     }
 
-    /*
-     * Convert an array of signers into an array of concatenated certificate
-     * arrays.
-     */
     private static java.security.cert.Certificate[] mapSignersToCertArray(
         CodeSigner[] signers) {
 
@@ -394,29 +282,17 @@ class JarVerifier {
                     signers[i].getSignerCertPath().getCertificates());
             }
 
-            // Convert into a Certificate[]
             return certChains.toArray(
                     new java.security.cert.Certificate[certChains.size()]);
         }
         return null;
     }
 
-    /**
-     * returns true if there no files to verify.
-     * should only be called after all the META-INF entries
-     * have been processed.
-     */
     boolean nothingToVerify()
     {
         return (anyToVerify == false);
     }
 
-    /**
-     * called to let us know we have processed all the
-     * META-INF entries, and if we re-read one of them, don't
-     * re-process it. Also gets rid of any data structures
-     * we needed when parsing META-INF entries.
-     */
     void doneWithMeta()
     {
         parsingMeta = false;
@@ -426,8 +302,6 @@ class JarVerifier {
         pendingBlocks = null;
         signerCache = null;
         manDig = null;
-        // MANIFEST.MF is always treated as signed and verified,
-        // move its signers from sigFileSigners to verifiedSigners.
         if (sigFileSigners.containsKey(JarFile.MANIFEST_NAME)) {
             CodeSigner[] codeSigners = sigFileSigners.remove(JarFile.MANIFEST_NAME);
             verifiedSigners.put(JarFile.MANIFEST_NAME, codeSigners);
@@ -502,18 +376,12 @@ class JarVerifier {
 
     }
 
-    // Extended JavaUtilJarAccess CodeSource API Support
 
     private Map<URL, Map<CodeSigner[], CodeSource>> urlToCodeSourceMap = new HashMap<>();
     private Map<CodeSigner[], CodeSource> signerToCodeSource = new HashMap<>();
     private URL lastURL;
     private Map<CodeSigner[], CodeSource> lastURLMap;
 
-    /*
-     * Create a unique mapping from codeSigner cache entries to CodeSource.
-     * In theory, multiple URLs origins could map to a single locally cached
-     * and shared JAR file although in practice there will be a single URL in use.
-     */
     private synchronized CodeSource mapSignersToCodeSource(URL url, CodeSigner[] signers) {
         Map<CodeSigner[], CodeSource> map;
         if (url == lastURL) {
@@ -548,9 +416,6 @@ class JarVerifier {
     }
     private CodeSigner[] emptySigner = new CodeSigner[0];
 
-    /*
-     * Match CodeSource to a CodeSigner[] in the signer cache.
-     */
     private CodeSigner[] findMatchingSigners(CodeSource cs) {
         if (cs instanceof VerifierCodeSource) {
             VerifierCodeSource vcs = (VerifierCodeSource) cs;
@@ -559,10 +424,6 @@ class JarVerifier {
             }
         }
 
-        /*
-         * In practice signers should always be optimized above
-         * but this handles a CodeSource of any type, just in case.
-         */
         CodeSource[] sources = mapSignersToCodeSources(cs.getLocation(), getJarCodeSigners(), true);
         List<CodeSource> sourceList = new ArrayList<>();
         for (int i = 0; i < sources.length; i++) {
@@ -580,10 +441,6 @@ class JarVerifier {
         return null;
     }
 
-    /*
-     * Instances of this class hold uncopied references to internal
-     * signing data that can be compared by object reference identity.
-     */
     private static class VerifierCodeSource extends CodeSource {
         private static final long serialVersionUID = -9047366145967768825L;
 
@@ -606,12 +463,6 @@ class JarVerifier {
             vcerts = certs; // from signerCache
         }
 
-        /*
-         * All VerifierCodeSource instances are constructed based on
-         * singleton signerCache or signerCacheCert entries for each unique signer.
-         * No CodeSigner<->Certificate[] conversion is required.
-         * We use these assumptions to optimize equality comparisons.
-         */
         public boolean equals(Object obj) {
             if (obj == this) {
                 return true;
@@ -619,11 +470,6 @@ class JarVerifier {
             if (obj instanceof VerifierCodeSource) {
                 VerifierCodeSource that = (VerifierCodeSource) obj;
 
-                /*
-                 * Only compare against other per-signer singletons constructed
-                 * on behalf of the same JarFile instance. Otherwise, compare
-                 * things the slower way.
-                 */
                 if (isSameDomain(that.csdomain)) {
                     if (that.vsigners != this.vsigners
                             || that.vcerts != this.vcerts) {
@@ -657,11 +503,6 @@ class JarVerifier {
 
     private synchronized Map<String, CodeSigner[]> signerMap() {
         if (signerMap == null) {
-            /*
-             * Snapshot signer state so it doesn't change on us. We care
-             * only about the asserted signatures. Verification of
-             * signature validity happens via the JarEntry apis.
-             */
             signerMap = new HashMap<>(verifiedSigners.size() + sigFileSigners.size());
             signerMap.putAll(verifiedSigners);
             signerMap.putAll(sigFileSigners);
@@ -674,10 +515,6 @@ class JarVerifier {
         final Iterator<Map.Entry<String, CodeSigner[]>> itor = map.entrySet().iterator();
         boolean matchUnsigned = false;
 
-        /*
-         * Grab a single copy of the CodeSigner arrays. Check
-         * to see if we can optimize CodeSigner equality test.
-         */
         List<CodeSigner[]> req = new ArrayList<>(cs.length);
         for (int i = 0; i < cs.length; i++) {
             CodeSigner[] match = findMatchingSigners(cs[i]);
@@ -729,10 +566,6 @@ class JarVerifier {
         };
     }
 
-    /*
-     * Like entries() but screens out internal JAR mechanism entries
-     * and includes signed entries with no ZIP data.
-     */
     public Enumeration<JarEntry> entries2(final JarFile jar, Enumeration<? extends ZipEntry> e) {
         final Map<String, CodeSigner[]> map = new HashMap<>();
         map.putAll(signerMap());
@@ -763,7 +596,6 @@ class JarVerifier {
                     return true;
                 }
 
-                // Any map entries left?
                 return false;
             }
 
@@ -789,7 +621,6 @@ class JarVerifier {
         }
     };
 
-    // true if file is part of the signature mechanism itself
     static boolean isSigningRelated(String name) {
         return SignatureFileVerifier.isSigningRelated(name);
     }
@@ -801,10 +632,6 @@ class JarVerifier {
 
             String name;
 
-            /*
-             * Grab entries from ZIP directory but screen out
-             * metadata.
-             */
             public boolean hasMoreElements() {
                 if (name != null) {
                     return true;

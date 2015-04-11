@@ -1,53 +1,11 @@
-/*
- * Copyright (c) 2000, 2005, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.prefs;
 
-/**
- * Static methods for translating Base64 encoded strings to byte arrays
- * and vice-versa.
- *
- * @author  Josh Bloch
- * @see     Preferences
- * @since   1.4
- */
 class Base64 {
-    /**
-     * Translates the specified byte array into a Base64 string as per
-     * Preferences.put(byte[]).
-     */
     static String byteArrayToBase64(byte[] a) {
         return byteArrayToBase64(a, false);
     }
 
-    /**
-     * Translates the specified byte array into an "alternate representation"
-     * Base64 string.  This non-standard variant uses an alphabet that does
-     * not contain the uppercase alphabetic characters, which makes it
-     * suitable for use in situations where case-folding occurs.
-     */
     static String byteArrayToAltBase64(byte[] a) {
         return byteArrayToBase64(a, true);
     }
@@ -60,7 +18,6 @@ class Base64 {
         StringBuffer result = new StringBuffer(resultLen);
         char[] intToAlpha = (alternate ? intToAltBase64 : intToBase64);
 
-        // Translate all full groups from byte array elements to Base64
         int inCursor = 0;
         for (int i=0; i<numFullGroups; i++) {
             int byte0 = a[inCursor++] & 0xff;
@@ -72,7 +29,6 @@ class Base64 {
             result.append(intToAlpha[byte2 & 0x3f]);
         }
 
-        // Translate partial group if present
         if (numBytesInPartialGroup != 0) {
             int byte0 = a[inCursor++] & 0xff;
             result.append(intToAlpha[byte0 >> 2]);
@@ -80,23 +36,15 @@ class Base64 {
                 result.append(intToAlpha[(byte0 << 4) & 0x3f]);
                 result.append("==");
             } else {
-                // assert numBytesInPartialGroup == 2;
                 int byte1 = a[inCursor++] & 0xff;
                 result.append(intToAlpha[(byte0 << 4)&0x3f | (byte1 >> 4)]);
                 result.append(intToAlpha[(byte1 << 2)&0x3f]);
                 result.append('=');
             }
         }
-        // assert inCursor == a.length;
-        // assert result.length() == resultLen;
         return result.toString();
     }
 
-    /**
-     * This array is a lookup table that translates 6-bit positive integer
-     * index values into their "Base64 Alphabet" equivalents as specified
-     * in Table 1 of RFC 2045.
-     */
     private static final char intToBase64[] = {
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
         'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -105,13 +53,6 @@ class Base64 {
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
     };
 
-    /**
-     * This array is a lookup table that translates 6-bit positive integer
-     * index values into their "Alternate Base64 Alphabet" equivalents.
-     * This is NOT the real Base64 Alphabet as per in Table 1 of RFC 2045.
-     * This alternate alphabet does not use the capital letters.  It is
-     * designed for use in environments where "case folding" occurs.
-     */
     private static final char intToAltBase64[] = {
         '!', '"', '#', '$', '%', '&', '\'', '(', ')', ',', '-', '.', ':',
         ';', '<', '>', '@', '[', ']', '^',  '`', '_', '{', '|', '}', '~',
@@ -120,25 +61,10 @@ class Base64 {
         '0', '1', '2', '3', '4', '5', '6',  '7', '8', '9', '+', '?'
     };
 
-    /**
-     * Translates the specified Base64 string (as per Preferences.get(byte[]))
-     * into a byte array.
-     *
-     * @throw IllegalArgumentException if <tt>s</tt> is not a valid Base64
-     *        string.
-     */
     static byte[] base64ToByteArray(String s) {
         return base64ToByteArray(s, false);
     }
 
-    /**
-     * Translates the specified "alternate representation" Base64 string
-     * into a byte array.
-     *
-     * @throw IllegalArgumentException or ArrayOutOfBoundsException
-     *        if <tt>s</tt> is not a valid alternate representation
-     *        Base64 string.
-     */
     static byte[] altBase64ToByteArray(String s) {
         return base64ToByteArray(s, true);
     }
@@ -162,7 +88,6 @@ class Base64 {
         }
         byte[] result = new byte[3*numGroups - missingBytesInLastGroup];
 
-        // Translate all full groups from base64 to byte array elements
         int inCursor = 0, outCursor = 0;
         for (int i=0; i<numFullGroups; i++) {
             int ch0 = base64toInt(s.charAt(inCursor++), alphaToInt);
@@ -174,7 +99,6 @@ class Base64 {
             result[outCursor++] = (byte) ((ch2 << 6) | ch3);
         }
 
-        // Translate partial group, if present
         if (missingBytesInLastGroup != 0) {
             int ch0 = base64toInt(s.charAt(inCursor++), alphaToInt);
             int ch1 = base64toInt(s.charAt(inCursor++), alphaToInt);
@@ -185,18 +109,9 @@ class Base64 {
                 result[outCursor++] = (byte) ((ch1 << 4) | (ch2 >> 2));
             }
         }
-        // assert inCursor == s.length()-missingBytesInLastGroup;
-        // assert outCursor == result.length;
         return result;
     }
 
-    /**
-     * Translates the specified character, which is assumed to be in the
-     * "Base 64 Alphabet" into its equivalent 6-bit positive integer.
-     *
-     * @throw IllegalArgumentException or ArrayOutOfBoundsException if
-     *        c is not in the Base64 Alphabet.
-     */
     private static int base64toInt(char c, byte[] alphaToInt) {
         int result = alphaToInt[c];
         if (result < 0)
@@ -204,13 +119,6 @@ class Base64 {
         return result;
     }
 
-    /**
-     * This array is a lookup table that translates unicode characters
-     * drawn from the "Base64 Alphabet" (as specified in Table 1 of RFC 2045)
-     * into their 6-bit positive integer equivalents.  Characters that
-     * are not in the Base64 alphabet but fall within the bounds of the
-     * array are translated to -1.
-     */
     private static final byte base64ToInt[] = {
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -221,10 +129,6 @@ class Base64 {
         35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
     };
 
-    /**
-     * This array is the analogue of base64ToInt, but for the nonstandard
-     * variant that avoids the use of uppercase alphabetic characters.
-     */
     private static final byte altBase64ToInt[] = {
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1,

@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2011, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.regex;
 
@@ -67,7 +43,6 @@ enum UnicodeProp {
     },
 
     WHITE_SPACE {
-        // \p{Whitespace}
         public boolean is(int ch) {
             return ((((1 << Character.SPACE_SEPARATOR) |
                       (1 << Character.LINE_SEPARATOR) |
@@ -77,14 +52,12 @@ enum UnicodeProp {
     },
 
     CONTROL {
-        // \p{gc=Control}
         public boolean is(int ch) {
             return Character.getType(ch) == Character.CONTROL;
         }
     },
 
     PUNCTUATION {
-        // \p{gc=Punctuation}
         public boolean is(int ch) {
             return ((((1 << Character.CONNECTOR_PUNCTUATION) |
                       (1 << Character.DASH_PUNCTUATION) |
@@ -98,8 +71,6 @@ enum UnicodeProp {
     },
 
     HEX_DIGIT {
-        // \p{gc=Decimal_Number}
-        // \p{Hex_Digit}    -> PropList.txt: Hex_Digit
         public boolean is(int ch) {
             return DIGIT.is(ch) ||
                    (ch >= 0x0030 && ch <= 0x0039) ||
@@ -118,32 +89,24 @@ enum UnicodeProp {
     },
 
     NONCHARACTER_CODE_POINT {
-        // PropList.txt:Noncharacter_Code_Point
         public boolean is(int ch) {
             return (ch & 0xfffe) == 0xfffe || (ch >= 0xfdd0 && ch <= 0xfdef);
         }
     },
 
     DIGIT {
-        // \p{gc=Decimal_Number}
         public boolean is(int ch) {
             return Character.isDigit(ch);
         }
     },
 
     ALNUM {
-        // \p{alpha}
-        // \p{digit}
         public boolean is(int ch) {
             return ALPHABETIC.is(ch) || DIGIT.is(ch);
         }
     },
 
     BLANK {
-        // \p{Whitespace} --
-        // [\N{LF} \N{VT} \N{FF} \N{CR} \N{NEL}  -> 0xa, 0xb, 0xc, 0xd, 0x85
-        //  \p{gc=Line_Separator}
-        //  \p{gc=Paragraph_Separator}]
         public boolean is(int ch) {
             return Character.getType(ch) == Character.SPACE_SEPARATOR ||
                    ch == 0x9; // \N{HT}
@@ -151,11 +114,6 @@ enum UnicodeProp {
     },
 
     GRAPH {
-        // [^
-        //  \p{space}
-        //  \p{gc=Control}
-        //  \p{gc=Surrogate}
-        //  \p{gc=Unassigned}]
         public boolean is(int ch) {
             return ((((1 << Character.SPACE_SEPARATOR) |
                       (1 << Character.LINE_SEPARATOR) |
@@ -168,20 +126,12 @@ enum UnicodeProp {
     },
 
     PRINT {
-        // \p{graph}
-        // \p{blank}
-        // -- \p{cntrl}
         public boolean is(int ch) {
             return (GRAPH.is(ch) || BLANK.is(ch)) && !CONTROL.is(ch);
         }
     },
 
     WORD {
-        //  \p{alpha}
-        //  \p{gc=Mark}
-        //  \p{digit}
-        //  \p{gc=Connector_Punctuation}
-        //  \p{Join_Control}    200C..200D
 
         public boolean is(int ch) {
             return ALPHABETIC.is(ch) ||
@@ -196,7 +146,6 @@ enum UnicodeProp {
     },
 
     JOIN_CONTROL {
-        //  200C..200D    PropList.txt:Join_Control
         public boolean is(int ch) {
            return (ch == 0x200C || ch == 0x200D);
         }

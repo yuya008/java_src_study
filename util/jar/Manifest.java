@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 
 package java.util.jar;
 
@@ -34,120 +10,43 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Iterator;
 
-/**
- * The Manifest class is used to maintain Manifest entry names and their
- * associated Attributes. There are main Manifest Attributes as well as
- * per-entry Attributes. For information on the Manifest format, please
- * see the
- * <a href="../../../../technotes/guides/jar/jar.html">
- * Manifest format specification</a>.
- *
- * @author  David Connelly
- * @see     Attributes
- * @since   1.2
- */
 public class Manifest implements Cloneable {
-    // manifest main attributes
     private Attributes attr = new Attributes();
 
-    // manifest entries
     private Map<String, Attributes> entries = new HashMap<>();
 
-    /**
-     * Constructs a new, empty Manifest.
-     */
     public Manifest() {
     }
 
-    /**
-     * Constructs a new Manifest from the specified input stream.
-     *
-     * @param is the input stream containing manifest data
-     * @throws IOException if an I/O error has occurred
-     */
     public Manifest(InputStream is) throws IOException {
         read(is);
     }
 
-    /**
-     * Constructs a new Manifest that is a copy of the specified Manifest.
-     *
-     * @param man the Manifest to copy
-     */
     public Manifest(Manifest man) {
         attr.putAll(man.getMainAttributes());
         entries.putAll(man.getEntries());
     }
 
-    /**
-     * Returns the main Attributes for the Manifest.
-     * @return the main Attributes for the Manifest
-     */
     public Attributes getMainAttributes() {
         return attr;
     }
 
-    /**
-     * Returns a Map of the entries contained in this Manifest. Each entry
-     * is represented by a String name (key) and associated Attributes (value).
-     * The Map permits the {@code null} key, but no entry with a null key is
-     * created by {@link #read}, nor is such an entry written by using {@link
-     * #write}.
-     *
-     * @return a Map of the entries contained in this Manifest
-     */
     public Map<String,Attributes> getEntries() {
         return entries;
     }
 
-    /**
-     * Returns the Attributes for the specified entry name.
-     * This method is defined as:
-     * <pre>
-     *      return (Attributes)getEntries().get(name)
-     * </pre>
-     * Though {@code null} is a valid {@code name}, when
-     * {@code getAttributes(null)} is invoked on a {@code Manifest}
-     * obtained from a jar file, {@code null} will be returned.  While jar
-     * files themselves do not allow {@code null}-named attributes, it is
-     * possible to invoke {@link #getEntries} on a {@code Manifest}, and
-     * on that result, invoke {@code put} with a null key and an
-     * arbitrary value.  Subsequent invocations of
-     * {@code getAttributes(null)} will return the just-{@code put}
-     * value.
-     * <p>
-     * Note that this method does not return the manifest's main attributes;
-     * see {@link #getMainAttributes}.
-     *
-     * @param name entry name
-     * @return the Attributes for the specified entry name
-     */
     public Attributes getAttributes(String name) {
         return getEntries().get(name);
     }
 
-    /**
-     * Clears the main Attributes as well as the entries in this Manifest.
-     */
     public void clear() {
         attr.clear();
         entries.clear();
     }
 
-    /**
-     * Writes the Manifest to the specified OutputStream.
-     * Attributes.Name.MANIFEST_VERSION must be set in
-     * MainAttributes prior to invoking this method.
-     *
-     * @param out the output stream
-     * @exception IOException if an I/O error has occurred
-     * @see #getMainAttributes
-     */
     public void write(OutputStream out) throws IOException {
         DataOutputStream dos = new DataOutputStream(out);
-        // Write out the main attributes for the manifest
         attr.writeMain(dos);
-        // Now write out the pre-entry attributes
         Iterator<Map.Entry<String, Attributes>> it = entries.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<String, Attributes> e = it.next();
@@ -166,9 +65,6 @@ public class Manifest implements Cloneable {
         dos.flush();
     }
 
-    /**
-     * Adds line breaks to enforce a maximum 72 bytes per line.
-     */
     static void make72Safe(StringBuffer line) {
         int length = line.length();
         if (length > 72) {
@@ -182,26 +78,12 @@ public class Manifest implements Cloneable {
         return;
     }
 
-    /**
-     * Reads the Manifest from the specified InputStream. The entry
-     * names and attributes read will be merged in with the current
-     * manifest entries.
-     *
-     * @param is the input stream
-     * @exception IOException if an I/O error has occurred
-     */
     public void read(InputStream is) throws IOException {
-        // Buffered input stream for reading manifest data
         FastInputStream fis = new FastInputStream(is);
-        // Line buffer
         byte[] lbuf = new byte[512];
-        // Read the main attributes for the manifest
         attr.read(fis, lbuf);
-        // Total number of entries, attributes read
         int ecount = 0, acount = 0;
-        // Average size of entry attributes
         int asize = 2;
-        // Now parse the manifest entries
         int len;
         String name = null;
         boolean skipEmptyLines = true;
@@ -225,18 +107,15 @@ public class Manifest implements Cloneable {
                     throw new IOException("invalid manifest format");
                 }
                 if (fis.peek() == ' ') {
-                    // name is wrapped
                     lastline = new byte[len - 6];
                     System.arraycopy(lbuf, 6, lastline, 0, len - 6);
                     continue;
                 }
             } else {
-                // continuation line
                 byte[] buf = new byte[lastline.length + len - 1];
                 System.arraycopy(lastline, 0, buf, 0, lastline.length);
                 System.arraycopy(lbuf, 1, buf, lastline.length, len - 1);
                 if (fis.peek() == ' ') {
-                    // name is wrapped
                     lastline = buf;
                     continue;
                 }
@@ -251,9 +130,6 @@ public class Manifest implements Cloneable {
             attr.read(fis, lbuf);
             ecount++;
             acount += attr.size();
-            //XXX: Fix for when the average is 0. When it is 0,
-            // you get an Attributes object with an initial
-            // capacity of 0, which tickles a bug in HashMap.
             asize = Math.max(2, acount / ecount);
 
             name = null;
@@ -278,14 +154,6 @@ public class Manifest implements Cloneable {
         return (c >= 'A' && c <= 'Z') ? 'a' + (c - 'A') : c;
     }
 
-    /**
-     * Returns true if the specified Object is also a Manifest and has
-     * the same main Attributes and entries.
-     *
-     * @param o the object to be compared
-     * @return true if the specified Object is also a Manifest and has
-     * the same main Attributes and entries
-     */
     public boolean equals(Object o) {
         if (o instanceof Manifest) {
             Manifest m = (Manifest)o;
@@ -296,28 +164,14 @@ public class Manifest implements Cloneable {
         }
     }
 
-    /**
-     * Returns the hash code for this Manifest.
-     */
     public int hashCode() {
         return attr.hashCode() + entries.hashCode();
     }
 
-    /**
-     * Returns a shallow copy of this Manifest.  The shallow copy is
-     * implemented as follows:
-     * <pre>
-     *     public Object clone() { return new Manifest(this); }
-     * </pre>
-     * @return a shallow copy of this Manifest
-     */
     public Object clone() {
         return new Manifest(this);
     }
 
-    /*
-     * A fast buffered input stream for parsing manifest files.
-     */
     static class FastInputStream extends FilterInputStream {
         private byte buf[];
         private int count = 0;
@@ -362,10 +216,6 @@ public class Manifest implements Cloneable {
             return len;
         }
 
-        /*
-         * Reads 'len' bytes from the input stream, or until an end-of-line
-         * is reached. Returns the number of bytes read.
-         */
         public int readLine(byte[] b, int off, int len) throws IOException {
             byte[] tbuf = this.buf;
             int total = 0;

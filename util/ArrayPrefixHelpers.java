@@ -1,34 +1,5 @@
-/*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
 package java.util;
 
-/*
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
- */
 
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.CountedCompleter;
@@ -37,64 +8,14 @@ import java.util.function.IntBinaryOperator;
 import java.util.function.LongBinaryOperator;
 import java.util.function.DoubleBinaryOperator;
 
-/**
- * ForkJoin tasks to perform Arrays.parallelPrefix operations.
- *
- * @author Doug Lea
- * @since 1.8
- */
 class ArrayPrefixHelpers {
     private ArrayPrefixHelpers() {}; // non-instantiable
 
-    /*
-     * Parallel prefix (aka cumulate, scan) task classes
-     * are based loosely on Guy Blelloch's original
-     * algorithm (http://www.cs.cmu.edu/~scandal/alg/scan.html):
-     *  Keep dividing by two to threshold segment size, and then:
-     *   Pass 1: Create tree of partial sums for each segment
-     *   Pass 2: For each segment, cumulate with offset of left sibling
-     *
-     * This version improves performance within FJ framework mainly by
-     * allowing the second pass of ready left-hand sides to proceed
-     * even if some right-hand side first passes are still executing.
-     * It also combines first and second pass for leftmost segment,
-     * and skips the first pass for rightmost segment (whose result is
-     * not needed for second pass).  It similarly manages to avoid
-     * requiring that users supply an identity basis for accumulations
-     * by tracking those segments/subtasks for which the first
-     * existing element is used as base.
-     *
-     * Managing this relies on ORing some bits in the pendingCount for
-     * phases/states: CUMULATE, SUMMED, and FINISHED. CUMULATE is the
-     * main phase bit. When false, segments compute only their sum.
-     * When true, they cumulate array elements. CUMULATE is set at
-     * root at beginning of second pass and then propagated down. But
-     * it may also be set earlier for subtrees with lo==0 (the left
-     * spine of tree). SUMMED is a one bit join count. For leafs, it
-     * is set when summed. For internal nodes, it becomes true when
-     * one child is summed.  When the second child finishes summing,
-     * we then moves up tree to trigger the cumulate phase. FINISHED
-     * is also a one bit join count. For leafs, it is set when
-     * cumulated. For internal nodes, it becomes true when one child
-     * is cumulated.  When the second child finishes cumulating, it
-     * then moves up tree, completing at the root.
-     *
-     * To better exploit locality and reduce overhead, the compute
-     * method loops starting with the current task, moving if possible
-     * to one of its subtasks rather than forking.
-     *
-     * As usual for this sort of utility, there are 4 versions, that
-     * are simple copy/paste/adapt variants of each other.  (The
-     * double and int versions differ from long version soley by
-     * replacing "long" (with case-matching)).
-     */
 
-    // see above
     static final int CUMULATE = 1;
     static final int SUMMED   = 2;
     static final int FINISHED = 4;
 
-    /** The smallest subtask array partition size to use as threshold */
     static final int MIN_PARTITION = 16;
 
     static final class CumulateTask<T> extends CountedCompleter<Void> {
@@ -104,7 +25,6 @@ class ArrayPrefixHelpers {
         T in, out;
         final int lo, hi, origin, fence, threshold;
 
-        /** Root task constructor */
         public CumulateTask(CumulateTask<T> parent,
                             BinaryOperator<T> function,
                             T[] array, int lo, int hi) {
@@ -117,7 +37,6 @@ class ArrayPrefixHelpers {
                     <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
-        /** Subtask constructor */
         CumulateTask(CumulateTask<T> parent, BinaryOperator<T> function,
                      T[] array, int origin, int fence, int threshold,
                      int lo, int hi) {
@@ -254,7 +173,6 @@ class ArrayPrefixHelpers {
         long in, out;
         final int lo, hi, origin, fence, threshold;
 
-        /** Root task constructor */
         public LongCumulateTask(LongCumulateTask parent,
                                 LongBinaryOperator function,
                                 long[] array, int lo, int hi) {
@@ -267,7 +185,6 @@ class ArrayPrefixHelpers {
                     <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
-        /** Subtask constructor */
         LongCumulateTask(LongCumulateTask parent, LongBinaryOperator function,
                          long[] array, int origin, int fence, int threshold,
                          int lo, int hi) {
@@ -403,7 +320,6 @@ class ArrayPrefixHelpers {
         double in, out;
         final int lo, hi, origin, fence, threshold;
 
-        /** Root task constructor */
         public DoubleCumulateTask(DoubleCumulateTask parent,
                                   DoubleBinaryOperator function,
                                   double[] array, int lo, int hi) {
@@ -416,7 +332,6 @@ class ArrayPrefixHelpers {
                     <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
-        /** Subtask constructor */
         DoubleCumulateTask(DoubleCumulateTask parent, DoubleBinaryOperator function,
                            double[] array, int origin, int fence, int threshold,
                            int lo, int hi) {
@@ -552,7 +467,6 @@ class ArrayPrefixHelpers {
         int in, out;
         final int lo, hi, origin, fence, threshold;
 
-        /** Root task constructor */
         public IntCumulateTask(IntCumulateTask parent,
                                IntBinaryOperator function,
                                int[] array, int lo, int hi) {
@@ -565,7 +479,6 @@ class ArrayPrefixHelpers {
                     <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
-        /** Subtask constructor */
         IntCumulateTask(IntCumulateTask parent, IntBinaryOperator function,
                         int[] array, int origin, int fence, int threshold,
                         int lo, int hi) {
