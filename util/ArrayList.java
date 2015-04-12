@@ -3,22 +3,21 @@ package java.util;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
-
 public class ArrayList<E> extends AbstractList<E>
         implements List<E>, RandomAccess, Cloneable, java.io.Serializable
 {
-    private static final long serialVersionUID = 8683452581122892189L;
+    private static final long serialVersionUID = 8683452581122892189L;// 序列化ID
 
-    private static final int DEFAULT_CAPACITY = 10;
+    private static final int DEFAULT_CAPACITY = 10;// 初始化容量10
 
-    private static final Object[] EMPTY_ELEMENTDATA = {};
+    private static final Object[] EMPTY_ELEMENTDATA = {};// 默认初始化一个空数组
 
-    private static final Object[] DEFAULTCAPACITY_EMPTY_ELEMENTDATA = {};
+    private static final Object[] DEFAULTCAPACITY_EMPTY_ELEMENTDATA = {};// 默认初始化一个空数组
 
-    transient Object[] elementData; // non-private to simplify nested class access
+    transient Object[] elementData; // 底层存放数据的数组
 
     private int size;
-
+    //  带容量的初始化
     public ArrayList(int initialCapacity) {
         if (initialCapacity > 0) {
             this.elementData = new Object[initialCapacity];
@@ -29,14 +28,16 @@ public class ArrayList<E> extends AbstractList<E>
                                                initialCapacity);
         }
     }
-
+    // 默认的初始化构造器
     public ArrayList() {
         this.elementData = DEFAULTCAPACITY_EMPTY_ELEMENTDATA;
     }
-
+    // 从其他容器初始化ArrayList
     public ArrayList(Collection<? extends E> c) {
         elementData = c.toArray();
+        // 给元素数复制
         if ((size = elementData.length) != 0) {
+            // 如果原始类型不是Object，创建一个Object的数组，且把元素复制进去
             if (elementData.getClass() != Object[].class)
                 elementData = Arrays.copyOf(elementData, size, Object[].class);
         } else {
@@ -62,34 +63,38 @@ public class ArrayList<E> extends AbstractList<E>
             ensureExplicitCapacity(minCapacity);
         }
     }
-
+    // 确保不要超出容量
     private void ensureCapacityInternal(int minCapacity) {
         if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
             minCapacity = Math.max(DEFAULT_CAPACITY, minCapacity);
         }
-
         ensureExplicitCapacity(minCapacity);
     }
 
     private void ensureExplicitCapacity(int minCapacity) {
-        modCount++;
-
+        modCount++; // ArrayList被使用次数自增
+        // 如果需要的容量超出了当前元素数组的长度，那么扩展元素数组
         if (minCapacity - elementData.length > 0)
             grow(minCapacity);
     }
-
+    // 最大容量上限警戒线
     private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
-
+    // 扩展元素数组
     private void grow(int minCapacity) {
         int oldCapacity = elementData.length;
+        // 每次增加原来长度的一半，可以预期如果元素很庞大的时候
+        // 算法的效率会越来越低，需要重新拷贝的元素越来越多
         int newCapacity = oldCapacity + (oldCapacity >> 1);
+        // 如果新容量小于需要的容量，那么就用需要的容量
         if (newCapacity - minCapacity < 0)
             newCapacity = minCapacity;
+        // 如果新需要的内存超出了MAX_ARRAY_SIZE，启动大内存分配
         if (newCapacity - MAX_ARRAY_SIZE > 0)
             newCapacity = hugeCapacity(minCapacity);
+        // 产生新数组
         elementData = Arrays.copyOf(elementData, newCapacity);
     }
-
+    // 大容量分配，最大容量只能分配到Integer.MAX_VALUE = 2147483647
     private static int hugeCapacity(int minCapacity) {
         if (minCapacity < 0) // overflow
             throw new OutOfMemoryError();

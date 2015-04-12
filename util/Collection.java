@@ -24,15 +24,9 @@ public interface Collection<E> extends Iterable<E> {
     boolean add(E e);
 
     boolean remove(Object o);
-
-
-
     boolean containsAll(Collection<?> c);
-
     boolean addAll(Collection<? extends E> c);
-
     boolean removeAll(Collection<?> c);
-
     default boolean removeIf(Predicate<? super E> filter) {
         Objects.requireNonNull(filter);
         boolean removed = false;
@@ -45,26 +39,17 @@ public interface Collection<E> extends Iterable<E> {
         }
         return removed;
     }
-
     boolean retainAll(Collection<?> c);
-
     void clear();
-
-
-
     boolean equals(Object o);
-
     int hashCode();
-
     @Override
     default Spliterator<E> spliterator() {
         return Spliterators.spliterator(this, 0);
     }
-
     default Stream<E> stream() {
         return StreamSupport.stream(spliterator(), false);
     }
-
     default Stream<E> parallelStream() {
         return StreamSupport.stream(spliterator(), true);
     }

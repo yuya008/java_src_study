@@ -1,7 +1,6 @@
 
 package java.util;
 
-
 public abstract class AbstractList<E> extends AbstractCollection<E> implements List<E> {
     protected AbstractList() {
     }
@@ -24,8 +23,6 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
     public E remove(int index) {
         throw new UnsupportedOperationException();
     }
-
-
 
     public int indexOf(Object o) {
         ListIterator<E> it = listIterator();

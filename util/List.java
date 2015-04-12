@@ -2,8 +2,6 @@
 package java.util;
 
 import java.util.function.UnaryOperator;
-
-
 public interface List<E> extends Collection<E> {
 
     int size();
@@ -84,7 +82,6 @@ public interface List<E> extends Collection<E> {
     ListIterator<E> listIterator();
 
     ListIterator<E> listIterator(int index);
-
 
     List<E> subList(int fromIndex, int toIndex);
 

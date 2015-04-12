@@ -2,7 +2,6 @@
 package java.util;
 
 import java.util.function.Consumer;
-
 public interface Iterator<E> {
     boolean hasNext();
 
