@@ -53,13 +53,15 @@ public class ArrayList<E> extends AbstractList<E>
               : Arrays.copyOf(elementData, size);
         }
     }
-
+    // 确保容量
     public void ensureCapacity(int minCapacity) {
+        // 确保默认初始化的数组容量是10
         int minExpand = (elementData != DEFAULTCAPACITY_EMPTY_ELEMENTDATA)
             ? 0
             : DEFAULT_CAPACITY;
-
+        
         if (minCapacity > minExpand) {
+            // 查看是否需要扩容，如果是则扩容
             ensureExplicitCapacity(minCapacity);
         }
     }
@@ -102,7 +104,7 @@ public class ArrayList<E> extends AbstractList<E>
             Integer.MAX_VALUE :
             MAX_ARRAY_SIZE;
     }
-
+    // 返回元素数
     public int size() {
         return size;
     }
@@ -116,13 +118,13 @@ public class ArrayList<E> extends AbstractList<E>
     }
 
     public int indexOf(Object o) {
-        if (o == null) {
+        if (o == null) {// 返回null的索引
             for (int i = 0; i < size; i++)
                 if (elementData[i]==null)
                     return i;
         } else {
             for (int i = 0; i < size; i++)
-                if (o.equals(elementData[i]))
+                if (o.equals(elementData[i]))// 通过equals判断相等
                     return i;
         }
         return -1;
@@ -188,6 +190,7 @@ public class ArrayList<E> extends AbstractList<E>
 
     public boolean add(E e) {
         ensureCapacityInternal(size + 1);  // Increments modCount!!
+        // 将元素放入最后一个位置，size++
         elementData[size++] = e;
         return true;
     }
@@ -196,6 +199,8 @@ public class ArrayList<E> extends AbstractList<E>
         rangeCheckForAdd(index);
 
         ensureCapacityInternal(size + 1);  // Increments modCount!!
+        // 把要插入的索引之后的元素，全部后移一位，同样有copy低效的问题，如果在比较
+        // 靠前的位置
         System.arraycopy(elementData, index, elementData, index + 1,
                          size - index);
         elementData[index] = element;
@@ -245,10 +250,10 @@ public class ArrayList<E> extends AbstractList<E>
 
     public void clear() {
         modCount++;
-
+        // 所有元素为null
         for (int i = 0; i < size; i++)
             elementData[i] = null;
-
+        // size清零
         size = 0;
     }
 
@@ -290,17 +295,17 @@ public class ArrayList<E> extends AbstractList<E>
         }
         size = newSize;
     }
-
+    // 检测索引下标是否越界
     private void rangeCheck(int index) {
         if (index >= size)
             throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
     }
-
+    // add操作的下标越界检查
     private void rangeCheckForAdd(int index) {
         if (index > size || index < 0)
             throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
     }
-
+    // 构成索引下标越界的异常信息
     private String outOfBoundsMsg(int index) {
         return "Index: "+index+", Size: "+size;
     }
@@ -384,43 +389,45 @@ public class ArrayList<E> extends AbstractList<E>
     public ListIterator<E> listIterator() {
         return new ListItr(0);
     }
-
+    // 返回迭代器实例
     public Iterator<E> iterator() {
         return new Itr();
     }
-
+    // 迭代器的实现
     private class Itr implements Iterator<E> {
-        int cursor;       // index of next element to return
-        int lastRet = -1; // index of last element returned; -1 if no such
-        int expectedModCount = modCount;
+        int cursor;       // 当前指针
+        int lastRet = -1; // 最后一次位置的指针
+        int expectedModCount = modCount;// 保存一个modCount的副本
 
         public boolean hasNext() {
-            return cursor != size;
+            return cursor != size;// 如果当前指针不等于元素数，说明还有元素没有迭代
         }
 
         @SuppressWarnings("unchecked")
         public E next() {
-            checkForComodification();
-            int i = cursor;
-            if (i >= size)
+            checkForComodification();// 并发修改检测
+            int i = cursor;// 把当前指针保存一个副本
+            if (i >= size)// 检测当前指针是否超出了size
                 throw new NoSuchElementException();
-            Object[] elementData = ArrayList.this.elementData;
+            Object[] elementData = ArrayList.this.elementData;// 一个指向外层元素数组的引用
             if (i >= elementData.length)
                 throw new ConcurrentModificationException();
+            // 当前指针前移
             cursor = i + 1;
             return (E) elementData[lastRet = i];
         }
 
         public void remove() {
+            // 状态判断
             if (lastRet < 0)
                 throw new IllegalStateException();
-            checkForComodification();
+            checkForComodification();// 并发修改检测
 
             try {
-                ArrayList.this.remove(lastRet);
-                cursor = lastRet;
-                lastRet = -1;
-                expectedModCount = modCount;
+                ArrayList.this.remove(lastRet);// 调用外层方法，删除lastRet位的元素
+                cursor = lastRet;// 指向下一个元素
+                lastRet = -1;// 防止重复删除
+                expectedModCount = modCount;// expectedModCount重新复制，防止并发修改异常
             } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
             }
@@ -446,14 +453,15 @@ public class ArrayList<E> extends AbstractList<E>
             lastRet = i - 1;
             checkForComodification();
         }
-
+        // 检查是否存在并发修改
         final void checkForComodification() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
         }
     }
-
+    // List迭代器
     private class ListItr extends Itr implements ListIterator<E> {
+        // 迭代索引开始位置
         ListItr(int index) {
             super();
             cursor = index;
@@ -472,9 +480,10 @@ public class ArrayList<E> extends AbstractList<E>
         }
 
         @SuppressWarnings("unchecked")
+        // 往前迭代
         public E previous() {
             checkForComodification();
-            int i = cursor - 1;
+            int i = cursor - 1;// 前移
             if (i < 0)
                 throw new NoSuchElementException();
             Object[] elementData = ArrayList.this.elementData;
@@ -755,14 +764,18 @@ public class ArrayList<E> extends AbstractList<E>
                                                offset + this.size, this.modCount);
         }
     }
-
+    // 迭代ArrayList的方法
     @Override
     public void forEach(Consumer<? super E> action) {
-        Objects.requireNonNull(action);
-        final int expectedModCount = modCount;
+        Objects.requireNonNull(action); // 如果action为空抛出空指针异常
+        final int expectedModCount = modCount;// 取得当前的操作计数
         @SuppressWarnings("unchecked")
         final E[] elementData = (E[]) this.elementData;
         final int size = this.size;
+        // modCount == expectedModCount 用来测试是否有并发修改
+        // 如果有人在当前迭代对象上调用了方法，这个这个方法又modCount++
+        // 那么modCount != expectedModCount 
+        // 会抛出ConcurrentModificationException异常
         for (int i=0; modCount == expectedModCount && i < size; i++) {
             action.accept(elementData[i]);
         }
